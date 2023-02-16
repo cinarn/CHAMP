@@ -205,7 +205,7 @@
       
       ! For backward compatibility with the older inputs, if 'orb_dot_coef' file exists, 
       ! program reads the orbital coefficients from the file. Otherwise, basis set=orbitals.
-      if ( (nloc.eq.-6 .or. nloc.eq.-7) .and. file_exist('orb_dot_coef') ) then !GO
+      if ( nloc.le.-6 .and. nloc.ge.-8 .and. file_exist('orb_dot_coef') ) then !GO
       
         write(6,'(''orbital coefficients - rows: norb, columns: nbasis'')')
       
