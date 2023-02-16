@@ -11,6 +11,7 @@
       use dim_mod
       use pseudo_mod
       use contrl_per_mod
+      use gs_mod !NC
       use distance_mod
       use periodic_1d_mod
       implicit real*8(a-h,o-z)
@@ -27,7 +28,8 @@
 ! Warning: temporary
 
       dimension x(3,*)
-
+      real*8 rsq_temp, pot_temp !NC
+      
 !  pe from nucleus-nucleus repulsion
       pe=pecent
       if(iperiodic.eq.0) then
@@ -125,6 +127,22 @@
             end do
         end if
       end if 
+
+      if(nloc.eq.-8) then !NC
+        do i=1, nelec
+          pot_temp = 0.d0
+          do j=1, gs_npot
+            do k=1, gs_ncent(j)
+              rsq_temp = gs_delta
+              do l=1, gs_ndim
+                rsq_temp = rsq_temp + (x(l,i)-gs_cent(l,k,j))**2
+              end do
+              pot_temp = pot_temp + gs_v0(j)*dexp(-(rsq_temp/gs_rho(j)**2)**gs_s(j))
+            end do
+          end do
+          pe_en = pe_en + gs_scale*(gs_vb + pot_temp)
+        end do
+      endif
 
 ! Calculate e-e inter-particle distances
         pe_ee=0.d0

@@ -59,6 +59,7 @@
       use branch_mod
       use periodic2_mod
       use periodic_1d_mod
+      use gs_mod !NC
       implicit real*8(a-h,o-z)
 
       parameter (eps=1.d-4)
@@ -147,6 +148,7 @@
 ! tau        time-step in dmc
 ! nloc       external potential (a positive value => nonlocal pseudopotential)
 !            -9 numerical dot potential read in from potential_num (not yet implemented)
+!            -8 gaussian sums !NC
 !            -7 gaussian dot potential, gndot_v0*dexp(-(r**2 / gndot_rho**2)**gndot_s)  !GO 
 !            -6 cylindrical dot potential, 0.5d0*cyldot_v*( tanh(cyldot_s*(r+cyldot_rho)) - tanh(cyldot_s*(r-cyldot_rho)) ) !GO
 !            -5 quadratic dot potential 0.5*w0^2*r^2 with barrier at center
@@ -756,7 +758,7 @@
       write(6,'(''nloc,numr ='',t31,4i5)') nloc,numr
       write(6,'(''nforce,nefp ='',t31,4i5)') nforce,nefp
 !     if(numr.gt.0) write(6,'(/,''numerical basis functions used'')')
-      if(nloc.lt.-7 .or. nloc.gt.6) stop 'nloc must be between -7 and 6 inclusive' !GO
+      if(nloc.lt.-8 .or. nloc.gt.6) stop 'nloc must be between -8 and 6 inclusive'
       if(nloc.ge.2) then
         read(5,*) nquad
         write(6,'(''nquad='',t31,i4)') nquad
@@ -808,6 +810,43 @@
         write(6,'(''height gndot pot., gndot_v0='',t31,f10.5)') gndot_v0
         write(6,'(''rad. gndot pot., gndot_rho='',t31,f10.5)') gndot_rho
         write(6,'(''stiff. gndot pot., gndot_s='',t31,f10.5)') gndot_s
+       elseif(nloc.eq.-8) then !NC
+         read(5,*) gs_ndim, gs_npot, gs_scale, gs_vb
+         call alloc('gs_ncent', gs_ncent, gs_npot)
+         write(6,'(''num. gauss. pot., gs_npot='',t50, I5)') gs_npot
+         write(6,'(''num. gauss. dim., gs_ndim='',t50, I5)') gs_ndim
+         write(6,'(''scale factor, gs_scale='',t50, f15.8)') gs_scale
+         write(6,'(''pot. bias, gs_vb='',t50, f15.8)') gs_vb
+         read(5,*) (gs_ncent(i),i=1,gs_npot)
+         call alloc('gs_v0', gs_v0, gs_npot)
+         call alloc('gs_rho', gs_rho, gs_npot)
+         call alloc('gs_s', gs_s, gs_npot)
+         call alloc('gs_cent', gs_cent, gs_ndim, maxval(gs_ncent), gs_npot)
+         do i=1, gs_npot
+           read(5,*) gs_v0(i), gs_rho(i), gs_s(i)
+           read(5,*) ((gs_cent(k,j,i),k=1,gs_ndim),j=1,gs_ncent(i))
+           write(6,'(''gs pot. idx='',t50, I5)') i
+           write(6,'(''gs pot. height, gs_v0='',t50,f15.8)') gs_v0(i)
+           write(6,'(''gs pot. radius, gs_rho='',t50,f15.8)') gs_rho(i)
+           write(6,'(''gs pot. height, gs_s='',t50,f15.8)') gs_s(i)
+           write(6,'(''gs pot. centers: '')')
+           do j=1, gs_ncent(i)
+             write(6, '(2f15.8)') (gs_cent(k,j,i),k=1,gs_ndim)
+           end do
+         end do
+         call object_modified('gs_ndim')
+         call object_modified('gs_npot')
+         call object_modified('gs_scale')
+         call object_modified('gs_vb')
+         call object_modified('gs_ncent')
+         call object_modified('gs_v0')
+         call object_modified('gs_rho')
+         call object_modified('gs_s')
+         call object_modified('gs_cent')
+         w0 = 0.d0 ! in order to use gaussian orbitals
+         bext = 0.d0 ! in order to use gaussian orbitals
+         glande = 0.d0 ! in order to use gaussian orbitals
+         we = 1.d0 ! in order to use gaussian orbitals
       endif
 
       call object_modified ('nloc') ! JT
@@ -860,7 +899,8 @@
       if(iperiodic.eq.2) stop 'systems periodic in 2d not yet implemented'
       if(ndim.eq.2.and.imetro.ne.1.and.index(mode,'vmc').ne.0) &
      &stop 'imetro!=1 not yet implemented for ndim=2'
-
+      if((nloc.eq.-8).and.(ndim.ne.gs_ndim)) stop 'gs_ndim must be equal to ndim' !NC
+     
       call object_modified ('ndim') ! JT
 
       if(iperiodic.eq.1) then

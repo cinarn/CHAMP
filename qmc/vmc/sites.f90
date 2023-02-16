@@ -10,6 +10,7 @@
       use wfsec_mod
       use dorb_mod
       use periodic_mod, only: rlatt_sim
+      use gs_mod
 
       implicit real*8(a-h,o-z)
 
@@ -65,6 +66,8 @@
             znucc = cyldot_rho
            elseif(nloc.eq.-7) then ! gaussian quantum dot !GO
             znucc = gndot_rho 
+           elseif(nloc.eq.-8) then !NC
+            znucc = 0.5d0*dexp(sum(dlog(gs_rho))/gs_npot) ! half of the geometric average of gaussian radii
            else ! atoms and molecules
             if(znuc(iwctype(i)).eq.0.d0) stop 'znuc should not be 0 in sites for atoms and molecules'
             znucc=znuc(iwctype(i))

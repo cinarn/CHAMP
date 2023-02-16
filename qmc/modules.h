@@ -42,6 +42,7 @@
           use contr3_mod
           use div_v_mod
           use phifun_mod
+          use gs_mod
           use distance_mod
           use distance_sav_mod
           use periodic_mod

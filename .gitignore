@@ -34,3 +34,6 @@ revision_and_date.inc
 documentation/*log
 documentation/*aux
 documentation/*pdf
+
+# other
+.vscode/
