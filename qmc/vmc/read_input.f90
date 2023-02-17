@@ -831,7 +831,7 @@
            write(6,'(''gs pot. height, gs_s='',t50,f15.8)') gs_s(i)
            write(6,'(''gs pot. centers: '')')
            do j=1, gs_ncent(i)
-             write(6, '(2f15.8)') (gs_cent(k,j,i),k=1,gs_ndim)
+             write(6, '(*(f15.8))') (gs_cent(k,j,i),k=1,gs_ndim)
            end do
          end do
          call object_modified('gs_ndim')
