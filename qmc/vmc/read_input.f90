@@ -1076,11 +1076,11 @@
    69   znuc_tot=znuc_tot+znuc(ict)
       if(iperiodic.eq.3) znuc_tot=znuc_tot*vcell_sim/vcell
       if(znuc_tot.ne.dfloat(nelec)) write(6,'(''znuc_tot='',f6.1,'' != nelec='',i4)') znuc_tot,nelec
-      if(abs(znuc_tot-dfloat(nelec)).gt.3) stop 'abs(znuc_tot - nelec) > 3' ! JT
+      !if(abs(znuc_tot-dfloat(nelec)).gt.3) stop 'abs(znuc_tot - nelec) > 3' ! JT
 
-      if(nloc.ne.-3) then ! RM
-        if(abs(znuc_tot-dfloat(nelec)).gt.6) stop 'abs(znuc_tot - nelec) > 6'
-      endif
+      !if(nloc.ne.-3) then ! RM
+      !  if(abs(znuc_tot-dfloat(nelec)).gt.6) stop 'abs(znuc_tot - nelec) > 6'
+      !endif
 
 ! TEMPORARY: Warning: we are not calling readforce and only using one geometry
       if(index(mode,'fit').ne.0) then
