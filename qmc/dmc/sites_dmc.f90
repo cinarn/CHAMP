@@ -16,16 +16,21 @@
       dimension nsite(ncent)
 
 !     sites
-      l=0
-      do i=1,ncent
-        nsite(i)=int(znuc(iwctype(i))+0.5d0)
-        l=l+nsite(i)
-        if(l.gt.nelec) then
-          nsite(i)=nsite(i)-(l-nelec)
-          l=nelec
-        endif
-      enddo
-      if(l.lt.nelec) nsite(1)=nsite(1)+(nelec-l)
+      ! distribute electrons randomly among the centers
+      l = nelec !NC
+      do i=1, ncent
+         nsite(i) = 0
+      end do
+      do while (l .gt. 0)
+         i = int(rannyu(0)*ncent + 0.5d0)
+         nsite(i) = nsite(i) + 1
+         if (nsite(i) .le. znuc(iwctype(i))) then
+            l = l - 1
+         else
+            nsite(i) = nsite(i) - 1
+         end if
+      end do 
+
 
 ! loop over spins and centers. If odd number of electrons on all
 ! atoms then the up-spins have an additional electron.

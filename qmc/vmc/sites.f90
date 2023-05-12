@@ -53,6 +53,8 @@
         if(zconst.eq.0.d0) stop 'zconst should not be 0 in sites for atoms in jellium (nloc=-3)'
       endif
 
+      write(6, '(''nsite = '',x,*(i6))') (nsite(i),i=1,ncent)
+
       ielec=0
       do 10 ispin=1,2
         do 10 i=1,ncent
@@ -67,7 +69,7 @@
            elseif(nloc.eq.-7) then ! gaussian quantum dot !GO
             znucc = gndot_rho 
            elseif(nloc.eq.-8) then !NC
-            znucc = 0.5d0*dexp(sum(dlog(gs_rho))/gs_npot) ! half of the geometric average of gaussian radii
+            znucc = dexp(sum(gs_ncent*dlog(gs_rho))/gs_npot/sum(gs_ncent)) ! geometric mean of all site potentials
            else ! atoms and molecules
             if(znuc(iwctype(i)).eq.0.d0) stop 'znuc should not be 0 in sites for atoms and molecules'
             znucc=znuc(iwctype(i))
@@ -80,6 +82,8 @@
               sitsca=1/znucc
              elseif(nloc.eq.-6 .or. nloc.eq.-7) then
               sitsca=znucc/2 !GO
+             elseif(nloc.eq.-8) then !NC
+              sitsca=znucc
              elseif(j.eq.1) then
               sitsca=1/max(znucc,1.d0)
              elseif(j.le.5) then
@@ -134,6 +138,12 @@
               angle = 2.0d0*pi*rannyu(0)
               x(1,ielec) = site*dcos(angle) + cent(1,iworbd(i,1))
               x(2,ielec) = site*dsin(angle) + cent(2,iworbd(i,1))
+              
+            elseif (nloc .eq. -8) then !NC
+              do k=1, ndim
+                x(k,ielec) = (0.5d0-rannyu(0))*sitsca
+              end do
+              
             else
                do 5 k=1,ndim
 ! sample position from exponentials or gaussian around center

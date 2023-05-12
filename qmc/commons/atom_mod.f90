@@ -6,6 +6,6 @@ module atom_mod
  integer,  allocatable :: iwctype(:),ncent_ctype(:)
  real(dp), allocatable :: cent(:,:)
  real(dp), allocatable :: znuc(:)
- real(dp)              :: pecent
+ real(dp)              :: pecent, znuc_tot
 
 end module atom_mod
