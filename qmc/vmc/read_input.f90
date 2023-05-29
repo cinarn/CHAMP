@@ -2200,10 +2200,10 @@
         call alloc ('norb_constraints', norb_constraints, notype)
         read(5,*) (norb_constraints(it),it=1,notype)
         write(6,'(''Number of constraints applied to each type of orbital: '',4(i4,1x))') (norb_constraints(it),it=1,notype) !GO
-        call alloc ('orb_constraints', orb_constraints, notype, norb-1, 2)
+        call alloc ('orb_constraints', orb_constraints, notype, nbasis-1, 2)
         do it=1,notype  ! read in constraints
-          if(norb_constraints(it).lt.0 .or. norb_constraints(it).gt.(norb-1)) then
-            write(6, '(''There must be between 0 and (norb-1) constraints'')')
+          if(norb_constraints(it).lt.0 .or. norb_constraints(it).gt.(nbasis-1)) then
+            write(6, '(''There must be between 0 and (nbasis-1) constraints'')')
             stop 'Invalid number of constraints.'
           endif
           if(norb_constraints(it).eq.0 .and. nparmo(it).lt.0) then
@@ -2232,8 +2232,8 @@
           endif
           do icon=1,norb_constraints(it)  ! check that constraints are ok
             write(6,'(''Constraining orbitals: '',2i5)') (orb_constraints(it,icon,j),j=1,2)
-            if (orb_constraints(it,icon,1).le.0 .or. orb_constraints(it,icon,1).gt.norb) then
-              write(6,'(''Constrained orbital must be between 1 and norb'')')
+            if (orb_constraints(it,icon,1).le.0 .or. orb_constraints(it,icon,1).gt.nbasis) then
+              write(6,'(''Constrained orbital must be between 1 and nbasis'')')
               stop 'Constrained orbital out of range'
             endif
             is_first_ok = 1 ! check to see if first orbital of pair is one that we aren't optimizing
