@@ -190,7 +190,7 @@
         ifr=1
 !       write(6,'(''total E'',i3,'' ='',t17,f12.7,'' +-'',f11.7,3f9.5,t82,f8.2)') !JT
 !    &  ifr,efin,eerr,eerr*rtpass,eerr1*rtpass,sigma,tcsq*tcsq
-        write(6,'(''total E'',i3,'' ='',f16.7,'' +-'',f11.7,3f9.5,'' +-'',f9.5,f8.2)') &
+        write(6,'(''total E'',i3,'' ='',f16.7,1x,'' +-'',1x,f11.7,1x,f9.5,1x,f9.5,1x,f9.5,1x,'' +-'',1x,f9.5,1x,f8.2)') &
      &  ifr,efin,eerr,eerr*rtpass,eerr1*rtpass,sigma,error_sigma,tcsq*tcsq
       endif
 
