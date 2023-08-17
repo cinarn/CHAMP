@@ -43,9 +43,9 @@
       write(6,*)
       write(6,'(a)') 'Find optimal add_diag by quadratic fit of 3 points:'
       write(6,'(a,3es10.3)') 'add_diag        = ', (add_diag(k),k=1,npts)
-      write(6,'(a,3f10.5)') 'log(add_diag)   = ', (add_diag_log(k),k=1,npts)
-      write(6,'(a,3f10.5)') 'energy_variance = ', (ene_var(k),k=1,npts)
-      write(6,'(a,3f10.5)') 'energy          = ', (energy(k),k=1,npts)
+      write(6,'(a,3f18.7)') 'log(add_diag)   = ', (add_diag_log(k),k=1,npts)
+      write(6,'(a,3f18.7)') 'energy_variance = ', (ene_var(k),k=1,npts)
+      write(6,'(a,3f18.7)') 'energy          = ', (energy(k),k=1,npts)
       if(ipr_opt.ge.1) write(6,'(''parameters for fit of energy/variance, b='',3es12.4)') b
 
       ene_var_min=9.d99
