@@ -223,7 +223,7 @@
           endif
 
           if(ndim.eq.2) then
-            write(6,'(f12.7,1x,5(f12.7,1x,"( ",i7," )",1x),17x,f10.5,1x,i10)') & !GO
+            write(6,'(f18.7,1x,5(f18.7,1x,"( ",i11," )",1x),17x,f18.7,1x,i11)') & !GO
      &      enow,eave,ieerr,peave,ipeerr,tpbave,itpber,tjfave,itjfer,emave,iemerr, &
      &      accave,it
            elseif(nloc.eq.-3) then !MS Jellium
@@ -254,7 +254,7 @@
           endif
           if(ndim.eq.2) then
             iferr=nint(10000000*ferr)
-            write(6,'(f12.7,f12.7,''('',i7,'')'',51x,f12.7,''('',i7,'')'')') &
+            write(6,'(f18.7,1x,f18.7,1x,''('',1x,i11,1x,'')'',51x,f18.7,1x,''('',1x,i11,1x,'')'',1x)') &
      &      enow,eave,ieerr,fave,iferr
            else
             iferr=nint(100000*ferr)
