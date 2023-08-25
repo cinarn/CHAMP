@@ -141,7 +141,7 @@
               
             elseif (nloc .eq. -8) then !NC
               do k=1, ndim
-                x(k,ielec) = (0.5d0-rannyu(0))*sitsca
+                x(k,ielec) = cent(k,i) + (0.5d0-rannyu(0))*sitsca
               end do
               
             else
