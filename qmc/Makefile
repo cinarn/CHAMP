@@ -80,8 +80,9 @@ SRCS =	accumulation_mod.f90 all_modules_mod.f90 all_tools_mod.f90 \
 	commons/pop_control_mod.f90 commons/pseudo_fahy_mod.f90 \
 	commons/pseudo_mod.f90 commons/pseudo_tm_mod.f90 \
 	commons/pworbital_mod.f90 commons/qua_mod.f90 commons/rlobxy_mod.f90 \
-	commons/slater_mod.f90 commons/slaterw_mod.f90 commons/slatn2_mod.f90 \
-	commons/slatn_mod.f90 commons/stats_mod.f90 commons/stepv_mod.f90 \
+	commons/site_pref_mod.f90 commons/slater_mod.f90 \
+	commons/slaterw_mod.f90 commons/slatn2_mod.f90 commons/slatn_mod.f90 \
+	commons/stats_mod.f90 commons/stepv_mod.f90 \
 	commons/tempor_test_mod.f90 commons/vardep_mod.f90 commons/vd_mod.f90 \
 	commons/velratio_mod.f90 commons/vj_mod.f90 commons/wfsec_mod.f90 \
 	commons/zigzag_mod.f90 MED_tools/average_mod.f90 \
@@ -255,13 +256,14 @@ OBJS =	$(OBJDIR)/accumulation_mod.o $(OBJDIR)/all_modules_mod.o \
 	$(OBJDIR)/commons/pseudo_fahy_mod.o $(OBJDIR)/commons/pseudo_mod.o \
 	$(OBJDIR)/commons/pseudo_tm_mod.o $(OBJDIR)/commons/pworbital_mod.o \
 	$(OBJDIR)/commons/qua_mod.o $(OBJDIR)/commons/rlobxy_mod.o \
-	$(OBJDIR)/commons/slater_mod.o $(OBJDIR)/commons/slaterw_mod.o \
-	$(OBJDIR)/commons/slatn2_mod.o $(OBJDIR)/commons/slatn_mod.o \
-	$(OBJDIR)/commons/stats_mod.o $(OBJDIR)/commons/stepv_mod.o \
-	$(OBJDIR)/commons/tempor_test_mod.o $(OBJDIR)/commons/vardep_mod.o \
-	$(OBJDIR)/commons/vd_mod.o $(OBJDIR)/commons/velratio_mod.o \
-	$(OBJDIR)/commons/vj_mod.o $(OBJDIR)/commons/wfsec_mod.o \
-	$(OBJDIR)/commons/zigzag_mod.o $(OBJDIR)/MED_tools/average_mod.o \
+	$(OBJDIR)/commons/site_pref_mod.o $(OBJDIR)/commons/slater_mod.o \
+	$(OBJDIR)/commons/slaterw_mod.o $(OBJDIR)/commons/slatn2_mod.o \
+	$(OBJDIR)/commons/slatn_mod.o $(OBJDIR)/commons/stats_mod.o \
+	$(OBJDIR)/commons/stepv_mod.o $(OBJDIR)/commons/tempor_test_mod.o \
+	$(OBJDIR)/commons/vardep_mod.o $(OBJDIR)/commons/vd_mod.o \
+	$(OBJDIR)/commons/velratio_mod.o $(OBJDIR)/commons/vj_mod.o \
+	$(OBJDIR)/commons/wfsec_mod.o $(OBJDIR)/commons/zigzag_mod.o \
+	$(OBJDIR)/MED_tools/average_mod.o \
 	$(OBJDIR)/MED_tools/catalog_averages_mod.o \
 	$(OBJDIR)/MED_tools/catalog_objects_mod.o \
 	$(OBJDIR)/MED_tools/catalog_routines_mod.o \
@@ -445,9 +447,9 @@ debug_mpi:
 
 $(OBJDIR)/%.o:%.f90
 	$(F95) $(F95_FLAGS) $(INCCMD)$(INCDIR) $(MODCMD)$(MODDIR) -o $@ -c $<
-$(OBJDIR)/%.o:vmc/%.f90
+$(OBJDIR)/%.o:MED_tools/%.f90
 	$(F95) $(F95_FLAGS) $(INCCMD)$(INCDIR) $(MODCMD)$(MODDIR) -o $@ -c $<
-$(OBJDIR)/%.o:vmc/MPI/%.f90
+$(OBJDIR)/%.o:commons/%.f90
 	$(F95) $(F95_FLAGS) $(INCCMD)$(INCDIR) $(MODCMD)$(MODDIR) -o $@ -c $<
 $(OBJDIR)/%.o:dmc/%.f90
 	$(F95) $(F95_FLAGS) $(INCCMD)$(INCDIR) $(MODCMD)$(MODDIR) -o $@ -c $<
@@ -455,17 +457,17 @@ $(OBJDIR)/%.o:dmc/dmc_elec/%.f90
 	$(F95) $(F95_FLAGS) $(INCCMD)$(INCDIR) $(MODCMD)$(MODDIR) -o $@ -c $<
 $(OBJDIR)/%.o:dmc/dmc_elec/MPI_global_pop/%.f90
 	$(F95) $(F95_FLAGS) $(INCCMD)$(INCDIR) $(MODCMD)$(MODDIR) -o $@ -c $<
-$(OBJDIR)/%.o:dmc/dmc_elec/MPI/%.f90
-	$(F95) $(F95_FLAGS) $(INCCMD)$(INCDIR) $(MODCMD)$(MODDIR) -o $@ -c $<
 $(OBJDIR)/%.o:dmc/dmc_elec/MPI_global_pop_big/%.f90
+	$(F95) $(F95_FLAGS) $(INCCMD)$(INCDIR) $(MODCMD)$(MODDIR) -o $@ -c $<
+$(OBJDIR)/%.o:dmc/dmc_elec/MPI/%.f90
 	$(F95) $(F95_FLAGS) $(INCCMD)$(INCDIR) $(MODCMD)$(MODDIR) -o $@ -c $<
 $(OBJDIR)/%.o:fit/%.f90
 	$(F95) $(F95_FLAGS) $(INCCMD)$(INCDIR) $(MODCMD)$(MODDIR) -o $@ -c $<
 $(OBJDIR)/%.o:fit/MPI/%.f90
 	$(F95) $(F95_FLAGS) $(INCCMD)$(INCDIR) $(MODCMD)$(MODDIR) -o $@ -c $<
-$(OBJDIR)/%.o:MED_tools/%.f90
+$(OBJDIR)/%.o:vmc/%.f90
 	$(F95) $(F95_FLAGS) $(INCCMD)$(INCDIR) $(MODCMD)$(MODDIR) -o $@ -c $<
-$(OBJDIR)/%.o:commons/%.f90
+$(OBJDIR)/%.o:vmc/MPI/%.f90
 	$(F95) $(F95_FLAGS) $(INCCMD)$(INCDIR) $(MODCMD)$(MODDIR) -o $@ -c $<
 $(OBJDIR)/%.o:%.c
 	$(CC) $(CC_FLAGS) $(INCCMD)$(INCDIR) $(MODCMD)$(MODDIR) -o $@ -c $<
@@ -513,12 +515,13 @@ $(OBJDIR)/all_modules_mod.o: $(OBJDIR)/commons/age_mod.o \
 	$(OBJDIR)/commons/phifun_mod.o $(OBJDIR)/commons/pjase_mod.o \
 	$(OBJDIR)/commons/pointer_mod.o $(OBJDIR)/commons/pop_control_mod.o \
 	$(OBJDIR)/commons/pseudo_mod.o $(OBJDIR)/commons/pworbital_mod.o \
-	$(OBJDIR)/commons/qua_mod.o $(OBJDIR)/commons/slater_mod.o \
-	$(OBJDIR)/commons/slaterw_mod.o $(OBJDIR)/commons/slatn2_mod.o \
-	$(OBJDIR)/commons/slatn_mod.o $(OBJDIR)/commons/stats_mod.o \
-	$(OBJDIR)/commons/stepv_mod.o $(OBJDIR)/commons/vd_mod.o \
-	$(OBJDIR)/commons/velratio_mod.o $(OBJDIR)/commons/vj_mod.o \
-	$(OBJDIR)/commons/wfsec_mod.o $(OBJDIR)/commons/zigzag_mod.o
+	$(OBJDIR)/commons/qua_mod.o $(OBJDIR)/commons/site_pref_mod.o \
+	$(OBJDIR)/commons/slater_mod.o $(OBJDIR)/commons/slaterw_mod.o \
+	$(OBJDIR)/commons/slatn2_mod.o $(OBJDIR)/commons/slatn_mod.o \
+	$(OBJDIR)/commons/stats_mod.o $(OBJDIR)/commons/stepv_mod.o \
+	$(OBJDIR)/commons/vd_mod.o $(OBJDIR)/commons/velratio_mod.o \
+	$(OBJDIR)/commons/vj_mod.o $(OBJDIR)/commons/wfsec_mod.o \
+	$(OBJDIR)/commons/zigzag_mod.o
 $(OBJDIR)/all_tools_mod.o: $(OBJDIR)/MED_tools/average_mod.o \
 	$(OBJDIR)/MED_tools/catalog_averages_mod.o \
 	$(OBJDIR)/MED_tools/catalog_objects_mod.o \
@@ -1257,7 +1260,8 @@ $(OBJDIR)/vmc/mc_configs.o: $(OBJDIR)/all_tools_mod.o \
 	$(OBJDIR)/commons/atom_mod.o $(OBJDIR)/commons/config_mod.o \
 	$(OBJDIR)/commons/const_mod.o $(OBJDIR)/commons/contr3_mod.o \
 	$(OBJDIR)/commons/contrl_mod.o $(OBJDIR)/commons/dim_mod.o \
-	$(OBJDIR)/commons/pairden_mod.o $(OBJDIR)/walkers_mod.o
+	$(OBJDIR)/commons/pairden_mod.o $(OBJDIR)/commons/site_pref_mod.o \
+	$(OBJDIR)/walkers_mod.o
 $(OBJDIR)/vmc/metrop_mov1.o: $(OBJDIR)/all_tools_mod.o \
 	$(OBJDIR)/commons/config_mod.o $(OBJDIR)/commons/const_mod.o \
 	$(OBJDIR)/commons/contrl_per_mod.o $(OBJDIR)/commons/delocc_mod.o \
@@ -1462,11 +1466,11 @@ $(OBJDIR)/vmc/read_input.o: $(OBJDIR)/all_tools_mod.o $(OBJDIR)/basis_mod.o \
 	$(OBJDIR)/commons/periodic_1d_mod.o $(OBJDIR)/commons/periodic_mod.o \
 	$(OBJDIR)/commons/pointer_mod.o $(OBJDIR)/commons/pseudo_mod.o \
 	$(OBJDIR)/commons/qua_mod.o $(OBJDIR)/commons/rlobxy_mod.o \
-	$(OBJDIR)/commons/wfsec_mod.o $(OBJDIR)/commons/zigzag_mod.o \
-	$(OBJDIR)/constants_mod.o $(OBJDIR)/control_mod.o \
-	$(OBJDIR)/fitdet_mod.o $(OBJDIR)/montecarlo_mod.o \
-	$(OBJDIR)/optimization_mod.o $(OBJDIR)/orbitals_mod.o \
-	$(OBJDIR)/variables_mod.o
+	$(OBJDIR)/commons/site_pref_mod.o $(OBJDIR)/commons/wfsec_mod.o \
+	$(OBJDIR)/commons/zigzag_mod.o $(OBJDIR)/constants_mod.o \
+	$(OBJDIR)/control_mod.o $(OBJDIR)/fitdet_mod.o \
+	$(OBJDIR)/montecarlo_mod.o $(OBJDIR)/optimization_mod.o \
+	$(OBJDIR)/orbitals_mod.o $(OBJDIR)/variables_mod.o
 $(OBJDIR)/vmc/read_orb_dot.o: $(OBJDIR)/all_tools_mod.o \
 	$(OBJDIR)/commons/basis1_mod.o $(OBJDIR)/commons/basis2_mod.o \
 	$(OBJDIR)/commons/basis3_mod.o $(OBJDIR)/commons/coefs_mod.o \

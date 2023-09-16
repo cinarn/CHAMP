@@ -11,6 +11,7 @@
       use const_mod
       use dim_mod
       use config_dmc_mod
+      use site_pref_mod
       implicit real*8(a-h,o-z)
 
       dimension nsite(ncent)
@@ -22,14 +23,17 @@
          nsite(i) = 0
       end do
       do while (l .gt. 0)
+         k = 1+(1+isign(1,l-nup-1))/2
          i = int(rannyu(0)*ncent + 0.5d0)
-         nsite(i) = nsite(i) + 1
-         if (nsite(i) .le. znuc(iwctype(i))) then
-            l = l - 1
-         else
-            nsite(i) = nsite(i) - 1
+         if (rannyu(0) .le. site_prob(k,i)) then
+            nsite(i) = nsite(i) + 1
+            if (nsite(i) .le. znuc(iwctype(i))) then
+               l = l - 1
+            else
+               nsite(i) = nsite(i) - 1
+            end if
          end if
-      end do 
+      end do
 
 
 ! loop over spins and centers. If odd number of electrons on all
