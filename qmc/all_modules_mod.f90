@@ -84,4 +84,5 @@ module all_modules_mod
   use velratio_mod
   use pop_control_mod
   use zigzag_mod
+  use site_pref_mod
 end module all_modules_mod

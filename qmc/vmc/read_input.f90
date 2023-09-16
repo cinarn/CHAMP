@@ -60,6 +60,7 @@
       use periodic2_mod
       use periodic_1d_mod
       use gs_mod !NC
+      use site_pref_mod !NC
       implicit real*8(a-h,o-z)
 
       parameter (eps=1.d-4)
@@ -95,6 +96,8 @@
       integer, allocatable :: iflag(:)
 
       character*25 lhere
+
+      integer sp_fid
 
 ! Inputs not described in mainvmc:
 ! The first line of input is fixed-format, all the rest are free.
@@ -811,12 +814,13 @@
         write(6,'(''rad. gndot pot., gndot_rho='',t31,f10.5)') gndot_rho
         write(6,'(''stiff. gndot pot., gndot_s='',t31,f10.5)') gndot_s
        elseif(nloc.eq.-8) then !NC
-         read(5,*) gs_ndim, gs_npot, gs_scale, gs_vb
-         call alloc('gs_ncent', gs_ncent, gs_npot)
+         read(5,*) gs_ndim, gs_npot, gs_scale, gs_vb, hsf_nf
          write(6,'(''num. gauss. pot., gs_npot='',t50, I5)') gs_npot
          write(6,'(''num. gauss. dim., gs_ndim='',t50, I5)') gs_ndim
          write(6,'(''scale factor, gs_scale='',t50, f15.8)') gs_scale
          write(6,'(''pot. bias, gs_vb='',t50, f15.8)') gs_vb
+         write(6,'(''num. heaviside step func. hsf_nf='',t50, I5)') hsf_nf
+         call alloc('gs_ncent', gs_ncent, gs_npot)
          read(5,*) (gs_ncent(i),i=1,gs_npot)
          call alloc('gs_v0', gs_v0, gs_npot)
          call alloc('gs_rho', gs_rho, gs_npot)
@@ -843,6 +847,35 @@
          call object_modified('gs_rho')
          call object_modified('gs_s')
          call object_modified('gs_cent')
+
+         if (hsf_nf .gt. 0) then
+          call alloc('hsf_cent', hsf_cent, gs_ndim, hsf_nf)
+          call alloc('hsf_gargs', hsf_gargs, 2, hsf_nf)
+          call alloc('hsf_c', hsf_c, hsf_nf)
+          call alloc('hsf_type', hsf_type, hsf_nf)
+          
+          do i=1, hsf_nf
+            write(6,'(''hsf idx='',t50, I5)') i
+            read(5,*) hsf_type(i), hsf_c(i)
+            write(6,'(''hsf type (0:linear, 1:radial) hsf_type='',t50,I5)') hsf_type(i)
+            write(6,'(''hsf curvature hsf_c='',t50,f15.8)') hsf_c(i)
+            if (hsf_type(i) .eq. 2) then
+              read(5,*) hsf_gargs(1,i), (hsf_cent(k,i),k=1,gs_ndim)
+              write(6,'(''hsf geom. args. (radius) hsf_gargs='',t50,f15.8)') hsf_gargs(1,i)
+            else if (hsf_type(i) .eq. 1) then
+              read(5,*) (hsf_gargs(k,i),k=1,gs_ndim-1), (hsf_cent(k,i),k=1,gs_ndim)
+              write(6,'(''hsf geom. args. (angles) hsf_gargs='',t50,*(f15.8))') (hsf_gargs(k,i),k=1,gs_ndim-1)
+            else
+              stop 'wrong hsf_type'
+            end if
+            write(6,'(''hsf center hsf_cent= '',*(f15.8))') (hsf_cent(k,i),k=1,gs_ndim)
+          enddo
+          call object_modified('hsf_nf')
+          call object_modified('hsf_c')
+          call object_modified('hsf_gargs')
+          call object_modified('hsf_cent')
+         end if
+
          w0 = 0.d0 ! in order to use gaussian orbitals
          bext = 0.d0 ! in order to use gaussian orbitals
          glande = 0.d0 ! in order to use gaussian orbitals
@@ -1135,6 +1168,22 @@
       call object_modified ('ndet') !JT
       call object_modified ('nbasis') !JT
       call object_modified ('norb') !JT
+
+      call alloc('site_prob', site_prob, 2, ncent)
+      if (file_exist('site_prob')) then
+        sp_fid = -1
+        call open_file_or_die('site_prob', sp_fid)
+        do i=1, 2
+          read(sp_fid,*) (site_prob(i,j), j=1, ncent)
+        end do
+        close(sp_fid)
+      else
+        site_prob = 1.d0/ncent
+      end if
+      call object_modified('site_prob')
+
+      write(6, '(''site_prob(1,:) = '',x,*(f10.8,1x))') (site_prob(1,j),j=1,ncent)
+      write(6, '(''site_prob(1,:) = '',x,*(f10.8,1x))') (site_prob(2,j),j=1,ncent)
 
 !     total number of orbitals
       orb_tot_nb = norb

@@ -140,7 +140,25 @@
               pot_temp = pot_temp + gs_v0(j)*dexp(-(rsq_temp/gs_rho(j)**2)**gs_s(j))
             end do
           end do
-          pe_en = pe_en + gs_scale*(gs_vb + pot_temp)
+          pot_temp = gs_scale*(gs_vb + pot_temp)
+          do j=1, hsf_nf
+            if (hsf_type(j) .eq. 2) then ! radial hsf
+              rsq_temp = 0
+              do k=1, gs_ndim
+                rsq_temp = rsq_temp + (x(k,i)-hsf_cent(k,j))**2
+              end do
+              pot_temp = pot_temp * 1.d0/(1.d0 + dexp(hsf_c(j)*(rsq_temp-hsf_gargs(1,j)**2)))
+            else ! linear hsf
+              if (gs_ndim .eq. 1) then
+                pot_temp = pot_temp * 1.d0/(1.d0 + dexp(hsf_c(j) * (x(1,i)-hsf_cent(1,j))))
+              else if (gs_ndim .eq. 2) then
+                pot_temp = pot_temp * 1.d0/(1.d0 + dexp(hsf_c(j) * (sindeg(hsf_gargs(1,j))*(x(1,i)-hsf_cent(1,j)) - cosdeg(hsf_gargs(1,j))*(x(2,i)-hsf_cent(2,j))) ))
+              else
+                pot_temp = pot_temp * 1.d0/(1.d0 + dexp(hsf_c(j) * (cosdeg(hsf_gargs(2,j))*(cosdeg(hsf_gargs(1,j))*(x(2,i)-hsf_cent(2,j)) - sindeg(hsf_gargs(1,j))*(x(1,i)-hsf_cent(1,j))) + sindeg(hsf_gargs(2,j))*(x(3,i)-hsf_cent(3,j))) ))
+              end if
+            end if
+          end do
+          pe_en = pe_en + pot_temp
         end do
       endif
 

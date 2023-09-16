@@ -53,7 +53,7 @@
         if(zconst.eq.0.d0) stop 'zconst should not be 0 in sites for atoms in jellium (nloc=-3)'
       endif
 
-      write(6, '(''nsite = '',x,*(i6))') (nsite(i),i=1,ncent)
+      write(6, '(''nsite = '',x,*(i6,1x))') (nsite(i),i=1,ncent)
 
       ielec=0
       do 10 ispin=1,2
