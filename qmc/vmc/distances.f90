@@ -150,11 +150,11 @@
               pot_temp = pot_temp * 1.d0/(1.d0 + dexp(hsf_c(j)*(rsq_temp-hsf_gargs(1,j)**2)))
             else ! linear hsf
               if (gs_ndim .eq. 1) then
-                pot_temp = pot_temp * 1.d0/(1.d0 + dexp(hsf_c(j) * (x(1,i)-hsf_cent(1,j))))
+                pot_temp = pot_temp * 1.d0/(1.d0 + dexp(-hsf_c(j) * (x(1,i)-hsf_cent(1,j))))
               else if (gs_ndim .eq. 2) then
                 pot_temp = pot_temp * 1.d0/(1.d0 + dexp(hsf_c(j) * (sindeg(hsf_gargs(1,j))*(x(1,i)-hsf_cent(1,j)) - cosdeg(hsf_gargs(1,j))*(x(2,i)-hsf_cent(2,j))) ))
               else
-                pot_temp = pot_temp * 1.d0/(1.d0 + dexp(hsf_c(j) * (cosdeg(hsf_gargs(2,j))*(cosdeg(hsf_gargs(1,j))*(x(2,i)-hsf_cent(2,j)) - sindeg(hsf_gargs(1,j))*(x(1,i)-hsf_cent(1,j))) + sindeg(hsf_gargs(2,j))*(x(3,i)-hsf_cent(3,j))) ))
+                pot_temp = pot_temp * 1.d0/(1.d0 + dexp(hsf_c(j) * (cosdeg(hsf_gargs(2,j))*(sindeg(hsf_gargs(1,j))*(x(1,i)-hsf_cent(1,j)) - cosdeg(hsf_gargs(1,j))*(x(2,i)-hsf_cent(2,j))) + sindeg(hsf_gargs(2,j))*(x(3,i)-hsf_cent(3,j))) ))
               end if
             end if
           end do
