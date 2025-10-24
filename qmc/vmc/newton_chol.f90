@@ -1086,7 +1086,7 @@
       write(6,'(/,''New wave function:'')')
 
       if(ncsf.gt.0) then
-        write(fmt,'(''('',i3,''f15.8,a)'')') ncsf
+        write(fmt,'(''('',i5,''f25.12,a)'')') ncsf
        else
         write(fmt,'(''(a)'')')
       endif
@@ -1105,7 +1105,7 @@
         enddo
       endif
       do it=1,notype
-        write(fmt,'(''('',i4,''f15.8,a)'')') nbasis !GO
+        write(fmt,'(''('',i5,''f25.12,a)'')') nbasis
         if(ipr_new.eq.0 .or. (ipr_new.eq.1 .and. iflag.ne.0)) then
           if(ibasis.eq.5) then
             if(it.eq.1) then

@@ -745,7 +745,7 @@
       write(6,'(/,''Best wave function:'')')
 
       if(nparmcsf.gt.0) then
-        write(fmt,'(''(''i2,''f15.8,a)'')') ncsf
+        write(fmt,'(''(''i5,''f25.12,a)'')') ncsf
         write(6,fmt) (csf_coef_best(i),i=1,ncsf),' (csf_coef_best(icsf),icsf=1,ncsf)'
         write(2,fmt) (csf_coef_best(i),i=1,ncsf),' (csf_coef(icsf),icsf=1,ncsf)'
       endif
