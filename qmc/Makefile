@@ -447,27 +447,27 @@ debug_mpi:
 
 $(OBJDIR)/%.o:%.f90
 	$(F95) $(F95_FLAGS) $(INCCMD)$(INCDIR) $(MODCMD)$(MODDIR) -o $@ -c $<
-$(OBJDIR)/%.o:MED_tools/%.f90
+$(OBJDIR)/%.o:fit/%.f90
 	$(F95) $(F95_FLAGS) $(INCCMD)$(INCDIR) $(MODCMD)$(MODDIR) -o $@ -c $<
-$(OBJDIR)/%.o:commons/%.f90
+$(OBJDIR)/%.o:fit/MPI/%.f90
 	$(F95) $(F95_FLAGS) $(INCCMD)$(INCDIR) $(MODCMD)$(MODDIR) -o $@ -c $<
 $(OBJDIR)/%.o:dmc/%.f90
 	$(F95) $(F95_FLAGS) $(INCCMD)$(INCDIR) $(MODCMD)$(MODDIR) -o $@ -c $<
 $(OBJDIR)/%.o:dmc/dmc_elec/%.f90
 	$(F95) $(F95_FLAGS) $(INCCMD)$(INCDIR) $(MODCMD)$(MODDIR) -o $@ -c $<
+$(OBJDIR)/%.o:dmc/dmc_elec/MPI/%.f90
+	$(F95) $(F95_FLAGS) $(INCCMD)$(INCDIR) $(MODCMD)$(MODDIR) -o $@ -c $<
 $(OBJDIR)/%.o:dmc/dmc_elec/MPI_global_pop/%.f90
 	$(F95) $(F95_FLAGS) $(INCCMD)$(INCDIR) $(MODCMD)$(MODDIR) -o $@ -c $<
 $(OBJDIR)/%.o:dmc/dmc_elec/MPI_global_pop_big/%.f90
 	$(F95) $(F95_FLAGS) $(INCCMD)$(INCDIR) $(MODCMD)$(MODDIR) -o $@ -c $<
-$(OBJDIR)/%.o:dmc/dmc_elec/MPI/%.f90
-	$(F95) $(F95_FLAGS) $(INCCMD)$(INCDIR) $(MODCMD)$(MODDIR) -o $@ -c $<
-$(OBJDIR)/%.o:fit/%.f90
-	$(F95) $(F95_FLAGS) $(INCCMD)$(INCDIR) $(MODCMD)$(MODDIR) -o $@ -c $<
-$(OBJDIR)/%.o:fit/MPI/%.f90
-	$(F95) $(F95_FLAGS) $(INCCMD)$(INCDIR) $(MODCMD)$(MODDIR) -o $@ -c $<
 $(OBJDIR)/%.o:vmc/%.f90
 	$(F95) $(F95_FLAGS) $(INCCMD)$(INCDIR) $(MODCMD)$(MODDIR) -o $@ -c $<
 $(OBJDIR)/%.o:vmc/MPI/%.f90
+	$(F95) $(F95_FLAGS) $(INCCMD)$(INCDIR) $(MODCMD)$(MODDIR) -o $@ -c $<
+$(OBJDIR)/%.o:MED_tools/%.f90
+	$(F95) $(F95_FLAGS) $(INCCMD)$(INCDIR) $(MODCMD)$(MODDIR) -o $@ -c $<
+$(OBJDIR)/%.o:commons/%.f90
 	$(F95) $(F95_FLAGS) $(INCCMD)$(INCDIR) $(MODCMD)$(MODDIR) -o $@ -c $<
 $(OBJDIR)/%.o:%.c
 	$(CC) $(CC_FLAGS) $(INCCMD)$(INCDIR) $(MODCMD)$(MODDIR) -o $@ -c $<
@@ -1714,7 +1714,8 @@ $(OBJDIR)/dmc/opt_wf_dmc.o: $(OBJDIR)/all_tools_mod.o \
 $(OBJDIR)/dmc/projector.o: $(OBJDIR)/bspline_oo_module.o
 $(OBJDIR)/dmc/sites_dmc.o: $(OBJDIR)/commons/atom_mod.o \
 	$(OBJDIR)/commons/config_dmc_mod.o $(OBJDIR)/commons/const_mod.o \
-	$(OBJDIR)/commons/contrl_mod.o $(OBJDIR)/commons/dim_mod.o
+	$(OBJDIR)/commons/contrl_mod.o $(OBJDIR)/commons/dim_mod.o \
+	$(OBJDIR)/commons/site_pref_mod.o
 $(OBJDIR)/dmc/sites_per.o: $(OBJDIR)/commons/dim_mod.o
 $(OBJDIR)/dmc/splitj_movall.o: $(OBJDIR)/commons/age_mod.o \
 	$(OBJDIR)/commons/branch_mod.o $(OBJDIR)/commons/config_dmc_mod.o \
@@ -1900,8 +1901,8 @@ $(OBJDIR)/vmc/MPI/grad_hess_jas_mpi.o: $(OBJDIR)/commons/contrl_opt2_mod.o \
 $(OBJDIR)/vmc/MPI/mc_configs.o: $(OBJDIR)/commons/atom_mod.o \
 	$(OBJDIR)/commons/config_mod.o $(OBJDIR)/commons/const_mod.o \
 	$(OBJDIR)/commons/contrl_mod.o $(OBJDIR)/commons/dim_mod.o \
-	$(OBJDIR)/commons/pairden_mod.o $(OBJDIR)/mpi_mod.o \
-	$(OBJDIR)/walkers_mod.o
+	$(OBJDIR)/commons/pairden_mod.o $(OBJDIR)/commons/site_pref_mod.o \
+	$(OBJDIR)/mpi_mod.o $(OBJDIR)/walkers_mod.o
 $(OBJDIR)/dmc/dmc_elec/MPI/acuest_dmc_mov1_mpi1.o: $(OBJDIR)/all_tools_mod.o \
 	$(OBJDIR)/commons/age_mod.o $(OBJDIR)/commons/atom_mod.o \
 	$(OBJDIR)/commons/basis1_mod.o $(OBJDIR)/commons/branch_mod.o \
