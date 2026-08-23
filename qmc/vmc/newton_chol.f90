@@ -317,7 +317,7 @@
    30     grad_cal(i)=grad_cal(i)+hess(i,j)*grad(j)
       dparm_norm=sqrt(dparm_norm/nparm)
 !     if(ipr_eigs.ge.1 .and. ipr_opt.ge.-4) write(6,'(''newton_chol: iadd_diag,add_diag(iadd_diag),dparm_norm='',i2,9f10.5)')
-      if(ipr_opt.ge.-4) write(6,'(''newton_chol: iadd_diag,add_diag(iadd_diag),dparm_norm='',i2,9f10.5)') &
+      if(ipr_opt.ge.-4) write(6,'(''newton_chol: iadd_diag,add_diag(iadd_diag),dparm_norm='',i2,d12.2,f10.5)') &
      &iadd_diag,add_diag(iadd_diag),dparm_norm
       if(ipr_eigs.ge.1 .and. ipr_opt.ge.1) write(6,'(''grad_cal='',9g12.4)') (grad_cal(i),i=1,nparm)
 !     if(ipr_eigs.ge.1 .and. ipr_opt.ge.0) write(6,'(''dparm='',100f10.6)') (dparm(i),i=1,nparm)
@@ -444,7 +444,7 @@
       do 30 i=1,nparm
    30   dparm_norm=dparm_norm+dparm(i)**2
       dparm_norm=sqrt(dparm_norm/nparm)
-      if(ipr_eigs.ge.1 .and. ipr_opt.ge.-4) write(6,'(''perturbation:iadd_diag,add_diag(iadd_diag),dparm_norm='',i2,9f10.5)') &
+      if(ipr_eigs.ge.1 .and. ipr_opt.ge.-4) write(6,'(''perturbation:iadd_diag,add_diag(iadd_diag),dparm_norm='',i2,d12.2,f10.5)') &
      &iadd_diag,add_diag(iadd_diag),dparm_norm
 !     if(ipr_eigs.ge.1 .and. ipr_opt.ge.0) write(6,'(''dparm='',100f10.6)') (dparm(i),i=1,nparm)
       write(6,'(''dparm='',100f10.6)') (dparm(i),i=1,nparm)
@@ -715,7 +715,7 @@
       do 60 iparm=1,nparm
    60   dparm_norm=dparm_norm+dparm(iparm)**2
       dparm_norm=sqrt(dparm_norm/nparm)
-!     if(ipr_eigs.ge.1 .and. ipr_opt.ge.-4) write(6,'(''linear:iadd_diag,add_diag(iadd_diag),dparm_norm='',i2,9f10.5)')
+!     if(ipr_eigs.ge.1 .and. ipr_opt.ge.-4) write(6,'(''linear:iadd_diag,add_diag(iadd_diag),dparm_norm='',i2,d12.2,f10.5)')
       if(ipr_opt.ge.-4) write(6,'(''linear:iadd_diag,add_diag(iadd_diag),dparm_norm='',i2,9f10.5)') &
      &iadd_diag,add_diag(iadd_diag),dparm_norm
       write(6,'(''dparm='',100f10.6)') (dparm(i),i=1,nparm)
@@ -853,7 +853,8 @@
         enddo
         if (nparmo(it).lt.0) then ! make sure to enforce constraints
           do icon=1,norb_constraints(it)
-             consgn = real(sign(1,orb_constraints(it,icon,2)))
+             !consgn = real(sign(1,orb_constraints(it,icon,2)))
+             consgn = sign(1.0d0, dble(orb_constraints(it,icon,2)))
              oparm(it,orb_constraints(it,icon,1),iadd_diag) = consgn*oparm(it,iabs(orb_constraints(it,icon,2)), iadd_diag)
           enddo
         endif
@@ -1028,13 +1029,27 @@
         write(6,'(''iadd_diag='',i2,d12.4,'' iflag=1. This is a bad move because scalek<0'')') iadd_diag,add_diag(1)
         iflag=1
       endif
+      
+      if (ibasis.eq.5) then !GO
+        if(nparmot.gt.0) then
+          if(nparmo(1).ne.0) then
+            do ib=1,nbasis
+              if(oparm(1,ib,iadd_diag).lt.0.d0) then
+                write(6,'(''iadd_diag='',i2,d12.4, &
+     &             '' iflag=1. This is a bad move because oparm(1,..) < 0'')') iadd_diag,add_diag(1)
+                iflag=1
+              endif
+            enddo
+          endif
+        endif
+      endif
 
       if(nparmot.gt.0) then
         if(nparmo(3).ne.0) then
           do ib=1,nbasis
             if(oparm(3,ib,iadd_diag).le.0.d0) then
               write(6,'(''iadd_diag='',i2,d12.4, &
-     &           '' iflag=1. This is a bad move because oparm(3,..) < 0'')') iadd_diag,add_diag(1)
+     &           '' iflag=1. This is a bad move because oparm(3,..) <= 0'')') iadd_diag,add_diag(1)
               iflag=1
             endif
             if (oparm(3,ib,iadd_diag) .gt. oparm3_max) then !GO
@@ -1052,7 +1067,7 @@
             do ib=1,nbasis
               if(oparm(4,ib,iadd_diag).le.0.d0) then
                 write(6,'(''iadd_diag='',i2,d12.4, &
-     &             '' iflag=1. This is a bad move because oparm(4,..) < 0'')') iadd_diag,add_diag(1)
+     &             '' iflag=1. This is a bad move because oparm(4,..) <= 0'')') iadd_diag,add_diag(1)
                 iflag=1
               endif
             enddo
@@ -1086,7 +1101,7 @@
       write(6,'(/,''New wave function:'')')
 
       if(ncsf.gt.0) then
-        write(fmt,'(''('',i5,''f25.12,a)'')') ncsf
+        write(fmt,'(''('',i3,''f25.12,a)'')') ncsf
        else
         write(fmt,'(''(a)'')')
       endif
@@ -1104,70 +1119,72 @@
           if(oparm(2,i,iadd_diag).gt.pi) oparm(2,i,iadd_diag)=oparm(2,i,iadd_diag)-2*pi
         enddo
       endif
-      do it=1,notype
-        write(fmt,'(''('',i5,''f25.12,a)'')') nbasis
-        if(ipr_new.eq.0 .or. (ipr_new.eq.1 .and. iflag.ne.0)) then
-          if(ibasis.eq.5) then
-            if(it.eq.1) then
-              write(6,fmt) (oparm(it,i,iadd_diag),i=1,nbasis),' (floating_gauss_rad_pos(it,i),i=1,nbasis)'
-              write(2,fmt) (oparm(it,i,iadd_diag),i=1,nbasis),' (floating_gauss_rad_pos(it,i),i=1,nbasis)'
-            elseif(it.eq.2) then
-              write(6,fmt) (oparm(it,i,iadd_diag),i=1,nbasis),' (floating_gauss_ang_pos(it,i),i=1,nbasis)'
-              write(2,fmt) (oparm(it,i,iadd_diag),i=1,nbasis),' (floating_gauss_ang_pos(it,i),i=1,nbasis)'
-            elseif(it.eq.3) then
-             write(6,fmt) (oparm(it,i,iadd_diag),i=1,nbasis),' (floating_gauss_rad_width(it,i),i=1,nbasis)'
-              write(2,fmt) (oparm(it,i,iadd_diag),i=1,nbasis),' (floating_gauss_rad_width(it,i),i=1,nbasis)'
-            elseif(it.eq.4) then
-              write(6,fmt) (oparm(it,i,iadd_diag),i=1,nbasis),' (floating_gauss_ang_width(it,i),i=1,nbasis)'
-              write(2,fmt) (oparm(it,i,iadd_diag),i=1,nbasis),' (floating_gauss_ang_width(it,i),i=1,nbasis)'
+      if(nparmot.gt.0) then
+        do it=1,notype
+          write(fmt,'(''('',i4,''f25.12,a)'')') nbasis !GO
+          if(ipr_new.eq.0 .or. (ipr_new.eq.1 .and. iflag.ne.0)) then
+            if(ibasis.eq.5) then
+              if(it.eq.1) then
+                write(6,fmt) (oparm(it,i,iadd_diag),i=1,nbasis),' (floating_gauss_rad_pos(it,i),i=1,nbasis)'
+                write(2,fmt) (oparm(it,i,iadd_diag),i=1,nbasis),' (floating_gauss_rad_pos(it,i),i=1,nbasis)'
+              elseif(it.eq.2) then
+                write(6,fmt) (oparm(it,i,iadd_diag),i=1,nbasis),' (floating_gauss_ang_pos(it,i),i=1,nbasis)'
+                write(2,fmt) (oparm(it,i,iadd_diag),i=1,nbasis),' (floating_gauss_ang_pos(it,i),i=1,nbasis)'
+              elseif(it.eq.3) then
+               write(6,fmt) (oparm(it,i,iadd_diag),i=1,nbasis),' (floating_gauss_rad_width(it,i),i=1,nbasis)'
+                write(2,fmt) (oparm(it,i,iadd_diag),i=1,nbasis),' (floating_gauss_rad_width(it,i),i=1,nbasis)'
+              elseif(it.eq.4) then
+                write(6,fmt) (oparm(it,i,iadd_diag),i=1,nbasis),' (floating_gauss_ang_width(it,i),i=1,nbasis)'
+                write(2,fmt) (oparm(it,i,iadd_diag),i=1,nbasis),' (floating_gauss_ang_width(it,i),i=1,nbasis)'
+              endif
+            else
+              if(it.eq.1) then
+                write(6,fmt) (oparm(it,i,iadd_diag),i=1,nbasis),' (floating_gauss_x_pos(it,i),i=1,nbasis)'
+                write(2,fmt) (oparm(it,i,iadd_diag),i=1,nbasis),' (floating_gauss_x_pos(it,i),i=1,nbasis)'
+              elseif(it.eq.2) then
+                write(6,fmt) (oparm(it,i,iadd_diag),i=1,nbasis),' (floating_gauss_y_pos(it,i),i=1,nbasis)'
+                write(2,fmt) (oparm(it,i,iadd_diag),i=1,nbasis),' (floating_gauss_y_pos(it,i),i=1,nbasis)'
+              elseif(it.eq.3) then
+               write(6,fmt) (oparm(it,i,iadd_diag),i=1,nbasis),' (floating_gauss_x_width(it,i),i=1,nbasis)'
+                write(2,fmt) (oparm(it,i,iadd_diag),i=1,nbasis),' (floating_gauss_x_width(it,i),i=1,nbasis)'
+              elseif(it.eq.4) then
+                write(6,fmt) (oparm(it,i,iadd_diag),i=1,nbasis),' (floating_gauss_y_width(it,i),i=1,nbasis)'
+                write(2,fmt) (oparm(it,i,iadd_diag),i=1,nbasis),' (floating_gauss_y_width(it,i),i=1,nbasis)'
+              endif
             endif
-          else
-            if(it.eq.1) then
-              write(6,fmt) (oparm(it,i,iadd_diag),i=1,nbasis),' (floating_gauss_x_pos(it,i),i=1,nbasis)'
-              write(2,fmt) (oparm(it,i,iadd_diag),i=1,nbasis),' (floating_gauss_x_pos(it,i),i=1,nbasis)'
-            elseif(it.eq.2) then
-              write(6,fmt) (oparm(it,i,iadd_diag),i=1,nbasis),' (floating_gauss_y_pos(it,i),i=1,nbasis)'
-              write(2,fmt) (oparm(it,i,iadd_diag),i=1,nbasis),' (floating_gauss_y_pos(it,i),i=1,nbasis)'
-            elseif(it.eq.3) then
-             write(6,fmt) (oparm(it,i,iadd_diag),i=1,nbasis),' (floating_gauss_x_width(it,i),i=1,nbasis)'
-              write(2,fmt) (oparm(it,i,iadd_diag),i=1,nbasis),' (floating_gauss_x_width(it,i),i=1,nbasis)'
-            elseif(it.eq.4) then
-              write(6,fmt) (oparm(it,i,iadd_diag),i=1,nbasis),' (floating_gauss_y_width(it,i),i=1,nbasis)'
-              write(2,fmt) (oparm(it,i,iadd_diag),i=1,nbasis),' (floating_gauss_y_width(it,i),i=1,nbasis)'
+           else
+            if(ibasis.eq.5) then
+              if(it.eq.1) then
+                write(6,fmt) (oparm(it,i,iadd_diag),i=1,nbasis),' (floating_gauss_rad_pos_new(it,i),i=1,nbasis)'
+                write(2,fmt) (oparm(it,i,iadd_diag),i=1,nbasis),' (floating_gauss_rad_pos_new(it,i),i=1,nbasis)'
+               elseif(it.eq.2) then
+                write(6,fmt) (oparm(it,i,iadd_diag),i=1,nbasis),' (floating_gauss_ang_pos_new(it,i),i=1,nbasis)'
+                write(2,fmt) (oparm(it,i,iadd_diag),i=1,nbasis),' (floating_gauss_ang_pos_new(it,i),i=1,nbasis)'
+              elseif(it.eq.3) then
+                write(6,fmt) (oparm(it,i,iadd_diag),i=1,nbasis),' (floating_gauss_rad_width_new(it,i),i=1,nbasis)'
+                write(2,fmt) (oparm(it,i,iadd_diag),i=1,nbasis),' (floating_gauss_rad_width_new(it,i),i=1,nbasis)'
+               elseif(it.eq.4) then
+                write(6,fmt) (oparm(it,i,iadd_diag),i=1,nbasis),' (floating_gauss_ang_width_new(it,i),i=1,nbasis)'
+                write(2,fmt) (oparm(it,i,iadd_diag),i=1,nbasis),' (floating_gauss_ang_width_new(it,i),i=1,nbasis)'
+              endif
+            else
+              if(it.eq.1) then
+                write(6,fmt) (oparm(it,i,iadd_diag),i=1,nbasis),' (floating_gauss_x_pos_new(it,i),i=1,nbasis)'
+                write(2,fmt) (oparm(it,i,iadd_diag),i=1,nbasis),' (floating_gauss_x_pos_new(it,i),i=1,nbasis)'
+              elseif(it.eq.2) then
+                write(6,fmt) (oparm(it,i,iadd_diag),i=1,nbasis),' (floating_gauss_y_pos_new(it,i),i=1,nbasis)'
+                write(2,fmt) (oparm(it,i,iadd_diag),i=1,nbasis),' (floating_gauss_y_pos_new(it,i),i=1,nbasis)'
+              elseif(it.eq.3) then
+               write(6,fmt) (oparm(it,i,iadd_diag),i=1,nbasis),' (floating_gauss_x_width_new(it,i),i=1,nbasis)'
+                write(2,fmt) (oparm(it,i,iadd_diag),i=1,nbasis),' (floating_gauss_x_width_new(it,i),i=1,nbasis)'
+              elseif(it.eq.4) then
+                write(6,fmt) (oparm(it,i,iadd_diag),i=1,nbasis),' (floating_gauss_y_width_new(it,i),i=1,nbasis)'
+                write(2,fmt) (oparm(it,i,iadd_diag),i=1,nbasis),' (floating_gauss_y_width_new(it,i),i=1,nbasis)'
+              endif
             endif
           endif
-         else
-          if(ibasis.eq.5) then
-            if(it.eq.1) then
-              write(6,fmt) (oparm(it,i,iadd_diag),i=1,nbasis),' (floating_gauss_rad_pos_new(it,i),i=1,nbasis)'
-              write(2,fmt) (oparm(it,i,iadd_diag),i=1,nbasis),' (floating_gauss_rad_pos_new(it,i),i=1,nbasis)'
-             elseif(it.eq.2) then
-              write(6,fmt) (oparm(it,i,iadd_diag),i=1,nbasis),' (floating_gauss_ang_pos_new(it,i),i=1,nbasis)'
-              write(2,fmt) (oparm(it,i,iadd_diag),i=1,nbasis),' (floating_gauss_ang_pos_new(it,i),i=1,nbasis)'
-            elseif(it.eq.3) then
-              write(6,fmt) (oparm(it,i,iadd_diag),i=1,nbasis),' (floating_gauss_rad_width_new(it,i),i=1,nbasis)'
-              write(2,fmt) (oparm(it,i,iadd_diag),i=1,nbasis),' (floating_gauss_rad_width_new(it,i),i=1,nbasis)'
-             elseif(it.eq.4) then
-              write(6,fmt) (oparm(it,i,iadd_diag),i=1,nbasis),' (floating_gauss_ang_width_new(it,i),i=1,nbasis)'
-              write(2,fmt) (oparm(it,i,iadd_diag),i=1,nbasis),' (floating_gauss_ang_width_new(it,i),i=1,nbasis)'
-            endif
-          else
-            if(it.eq.1) then
-              write(6,fmt) (oparm(it,i,iadd_diag),i=1,nbasis),' (floating_gauss_x_pos_new(it,i),i=1,nbasis)'
-              write(2,fmt) (oparm(it,i,iadd_diag),i=1,nbasis),' (floating_gauss_x_pos_new(it,i),i=1,nbasis)'
-            elseif(it.eq.2) then
-              write(6,fmt) (oparm(it,i,iadd_diag),i=1,nbasis),' (floating_gauss_y_pos_new(it,i),i=1,nbasis)'
-              write(2,fmt) (oparm(it,i,iadd_diag),i=1,nbasis),' (floating_gauss_y_pos_new(it,i),i=1,nbasis)'
-            elseif(it.eq.3) then
-             write(6,fmt) (oparm(it,i,iadd_diag),i=1,nbasis),' (floating_gauss_x_width_new(it,i),i=1,nbasis)'
-              write(2,fmt) (oparm(it,i,iadd_diag),i=1,nbasis),' (floating_gauss_x_width_new(it,i),i=1,nbasis)'
-            elseif(it.eq.4) then
-              write(6,fmt) (oparm(it,i,iadd_diag),i=1,nbasis),' (floating_gauss_y_width_new(it,i),i=1,nbasis)'
-              write(2,fmt) (oparm(it,i,iadd_diag),i=1,nbasis),' (floating_gauss_y_width_new(it,i),i=1,nbasis)'
-            endif
-          endif
-        endif
-      enddo
+        enddo
+      endif
 
       if(nparms.gt.0) then
         write(6,'(/,''scalek parameter:'')')

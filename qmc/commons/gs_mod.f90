@@ -2,7 +2,7 @@ module gs_mod !NC
 
   implicit none
   save
-  
+
   ! gs_delta    small number to prevent singularities at pot. centers
   ! gs_npot     num. of gaussians
   ! gs_ndim     number of dimensions (must be equal to ndim)
@@ -17,7 +17,7 @@ module gs_mod !NC
   ! hsf_c       curvature of the step functions                     (1:hsf_nf)
   ! hsf_gargs   geometry arguments of the step functions,           (1:2, 1:hsf_nf)
   !             (radius for radial, the angles of crossings for linear)
-  ! hsf_cent    center coordinates for the step functions           (1:gs_ndim, 1:hsf_nf) 
+  ! hsf_cent    center coordinates for the step functions           (1:gs_ndim, 1:hsf_nf)
 
   double precision, parameter    :: gs_delta = 1.0d-15
 
@@ -48,6 +48,5 @@ contains
     double precision, intent(in) :: t
     double precision :: sindeg_fun
     sindeg_fun = sin(t*pi/180.d0)
-  end function   
+  end function
 end module gs_mod
-

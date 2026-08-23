@@ -53,8 +53,23 @@
       common /dojasderiv/ ijasderiv
 
       dimension x(3,*),rvec_en(3,nelec,*),r_en(nelec,*),ddet_det(3,*),div_vd(nelec)
-      dimension dporb(notype,nbasis,nelec,norb),d2porb(notype,notype,nbasis,nelec,norb)
-      dimension ddporb(3,notype,nbasis,nelec,norb),d2dporb(notype,nbasis,nelec,norb)
+      
+! >>> ALLOCATE LARGE MEMORY ONCE IN BSS TO SAVE MEMORY BANDWIDTH <<< !GO
+      real*8, allocatable, save :: dporb(:,:,:,:), d2porb(:,:,:,:,:)
+      real*8, allocatable, save :: ddporb(:,:,:,:,:), d2dporb(:,:,:,:)
+      logical, save :: is_dporb_allocated = .false.
+      
+      if (.not. is_dporb_allocated) then
+        allocate(dporb(notype,nbasis,nelec,norb))
+        allocate(d2porb(notype,notype,nbasis,nelec,norb))
+        allocate(ddporb(3,notype,nbasis,nelec,norb))
+        allocate(d2dporb(notype,nbasis,nelec,norb))
+        dporb = 0.0d0
+        d2porb = 0.0d0
+        ddporb = 0.0d0
+        d2dporb = 0.0d0
+        is_dporb_allocated = .true.
+      endif
 
 ! initialize the derivative arrays to zero
       do 10 i=1,nelec
@@ -352,7 +367,7 @@
 !--------------------------------------------------------------------------------------
       subroutine deriv_det_orb(orb,dorb,ddorb,dporb,d2porb,ddporb,d2dporb,detinv)
 ! Written by A.D.Guclu, Apr 2006
-! Heavily modified by Gokhan Oztarhan, Oct 2023
+! Heavily modified by Gokhan Oztarhan, Oct 2023, Aug 2026
 
 ! Calculates derivatives wrt orbital parameters for optimization
 
@@ -421,12 +436,19 @@
       dimension ddetui(3,nelec,ndetup),ddetdi(3,nelec,ndetdn)
       dimension d2detui(ndetup),d2detdi(ndetdn)
       dimension slmfui(nup,nup,ndetup),slmfdi(ndn,ndn,ndetdn)
-      dimension amatu(nup,nup),amatd(ndn,ndn)
-      dimension amattempu(nup,nup),amattempd(ndn,ndn)
       
+      ! Matrices defined for O(N^2) trace reduction (asd.pdf Eq 5 & 7)
+      dimension Y_u(nup,nup), Y_d(ndn,ndn)
+      dimension D_velu(3,nup,nup,ndetup), D_lapu(nup,nup,ndetup)
+      dimension D_veld(3,ndn,ndn,ndetdn), D_lapd(ndn,ndn,ndetdn)
+      
+      ! Hessian specific array (Computed explicitly if iopt == 2)
+      dimension amatu(nup,nup),amatd(ndn,ndn)
+      
+      ! Buffers for cartesian summation
+      dimension sum_p_accu(3), sum_d_mat(3)
 
 ! initializations of local and output variables:
-! complete initialization of detij_det is done in determinant()
       do iparm0=1,nparmot
         iparm=iparm0+nparmcsf
         d2deti_det(iparm)=0
@@ -438,207 +460,255 @@
           detdi(iparm0,idet)=0
         enddo
         do i=1,nelec
-          do k=1,ndim
-            ddeti_det(k,i,iparm)=0
+          do idim=1,ndim
+            ddeti_det(idim,i,iparm)=0
           enddo
         enddo
       enddo
       
       ! Save inverse of Slater matrix (not transposed) to 2d array 
-      ! by calculating the transpose of transposed inverse of Slater matrix (slmui)
       slmfui = 0
       do idet = 1, ndetup
-        do i = 1, nup
-          jk = -nup
-          do j = 1, nup
-            jk = jk + nup
-            slmfui(i,j,idet) = slmui(i+jk,idet)
-          enddo
-        enddo
+        slmfui(:,:,idet) = reshape(slmui(1:nup*nup, idet), [nup, nup])
       enddo
       slmfdi = 0
       do idet = 1, ndetdn
-        do i = 1, ndn
-          jk = -ndn
-          do j = 1, ndn
-            jk = jk + ndn
-            slmfdi(i,j,idet) = slmdi(i+jk,idet)
+        slmfdi(:,:,idet) = reshape(slmdi(1:ndn*ndn, idet), [ndn, ndn])
+      enddo
+      
+      ! --- BEGIN O(N^3) PRECOMPUTATION ---
+      ! Precompute D^(i) = B^(i) * A^-1 for velocity and Laplacian
+      D_velu = 0.0d0
+      D_lapu = 0.0d0
+      do idet = 1, ndetup
+        do k = 1, nup
+          do ie = 1, nup
+            do m = 1, nup
+              iorb_m = iworbdup(m,idet)
+              S_mk = slmfui(m,k,idet)
+              do idim = 1, ndim
+                D_velu(idim, ie, k, idet) = D_velu(idim, ie, k, idet) + dorb(idim, ie, iorb_m) * S_mk
+              enddo
+              D_lapu(ie, k, idet) = D_lapu(ie, k, idet) + ddorb(ie, iorb_m) * S_mk
+            enddo
           enddo
         enddo
       enddo
+      
+      D_veld = 0.0d0
+      D_lapd = 0.0d0
+      do idet = 1, ndetdn
+        do k = 1, ndn
+          do ie = 1, ndn
+            do m = 1, ndn
+              iorb_m = iworbddn(m,idet)
+              S_mk = slmfdi(m,k,idet)
+              do idim = 1, ndim
+                D_veld(idim, ie, k, idet) = D_veld(idim, ie, k, idet) + dorb(idim, ie+nup, iorb_m) * S_mk
+              enddo
+              D_lapd(ie, k, idet) = D_lapd(ie, k, idet) + ddorb(ie+nup, iorb_m) * S_mk
+            enddo
+          enddo
+        enddo
+      enddo
+      ! --- END PRECOMPUTATION ---
       
       iparm0 = 0
       do it = 1, notype
         do ip = 1, iabs(nparmo(it))
           iparm0 = iparm0 + 1
           
-          ! Following are array assignments
-          ddetui = 0
-          d2detui = 0
-          detuij = 0
-          ddetdi = 0
-          d2detdi = 0
-          detdij = 0
+          ! Use mapping array to find the true independent basis function index
+          ip_mapped = iwo(ip,it)
+          
+          ddetui = 0; d2detui = 0; detuij = 0
+          ddetdi = 0; d2detdi = 0; detdij = 0
         
           ! Up electrons
           do idet = 1, ndetup
           
-            ! Constract A^-1 * dA * A^-1
-            amattempu = 0
-            do k = 1, nup
-              do j = 1, nup
-                do i = 1, nup
-                  amattempu(i,j) = amattempu(i,j) + slmfui(i,j,idet) * dporb(it,ip,j,iworbdup(k,idet))
-                enddo
-              enddo
-            enddo
-            amatu = 0
-            do k = 1, nup
-              do j = 1, nup
-                do i = 1, nup
-                  amatu(i,j) = amatu(i,j) + amattempu(i,j) * slmfui(j,k,idet)
-                enddo
-              enddo
-            enddo
-            
-            ! First parameter derivatives
+            ! Form intermediate matrix Y^(alpha) = (d_alpha A) A^-1
+            Y_u = 0.0d0
             do i = 1, nup
-              do j = 1, nup
-                detui(iparm0,idet) = detui(iparm0,idet) &
-     &             + slmfui(j,i,idet) * dporb(it,ip,i,iworbdup(j,idet))
+              do m = 1, nup
+                S_mi = slmfui(m,i,idet)
+                iorb_m = iworbdup(m,idet)
+                do j = 1, nup
+                  Y_u(j,i) = Y_u(j,i) + dporb(it, ip_mapped, j, iorb_m) * S_mi
+                enddo
               enddo
             enddo
 
-            ! Velocity of first parameter derivatives
-            do ie = 1, nup
-              do j = 1, nup
-                do idim=1,ndim
-                  ddetui(idim,ie,idet) = ddetui(idim,ie,idet) &
-     &               + ddporb(idim,it,ip,ie,iworbdup(j,idet)) * slmfui(j,ie,idet) &
-     &               - dorb(idim,ie,iworbdup(j,idet)) * amatu(j,ie)
-                enddo
-              enddo
+            ! First parameter derivatives (Trace of Y)
+            do i = 1, nup
+              detui(iparm0,idet) = detui(iparm0,idet) + Y_u(i,i)
             enddo
-            
-            ! Laplacian of first parameter derivatives
+
+            ! Velocity and Laplacian using O(N^2) trace collapse
             do ie = 1, nup
+              ! Trace term accumulation (T = tr(Y * D))
+              sum_p_accu(1:ndim) = 0.0d0
+              sum_p_accul = 0.0d0
               do j = 1, nup
-                d2detui(idet) = d2detui(idet) &
-     &             + d2dporb(it,ip,ie,iworbdup(j,idet)) * slmfui(j,ie,idet) &
-     &             - ddorb(ie,iworbdup(j,idet)) * amatu(j,ie)
+                Y_val = Y_u(j, ie)
+                do idim = 1, ndim
+                  sum_p_accu(idim) = sum_p_accu(idim) + Y_val * D_velu(idim, ie, j, idet)
+                enddo
+                sum_p_accul = sum_p_accul + Y_val * D_lapu(ie, j, idet)
               enddo
+              
+              ! D-matrix term accumulation (tr(A^-1 * dA))
+              sum_d_mat(1:ndim) = 0.0d0
+              sum_d_matl = 0.0d0
+              do m = 1, nup
+                S_mi = slmfui(m, ie, idet)
+                iorb_m = iworbdup(m, idet)
+                do idim = 1, ndim
+                  sum_d_mat(idim) = sum_d_mat(idim) + ddporb(idim, it, ip_mapped, ie, iorb_m) * S_mi
+                enddo
+                sum_d_matl = sum_d_matl + d2dporb(it, ip_mapped, ie, iorb_m) * S_mi
+              enddo
+              
+              do idim = 1, ndim
+                ddetui(idim, ie, idet) = ddetui(idim, ie, idet) + sum_d_mat(idim) - sum_p_accu(idim)
+              enddo
+              d2detui(idet) = d2detui(idet) + sum_d_matl - sum_p_accul
             enddo
             
             ! Second parameter derivatives if doing newton
             if (iopt .eq. 2) then
+              ! Explicitly form M^(alpha) = A^-1 Y^(alpha) for Hessian
+              amatu = 0.0d0
+              do i = 1, nup
+                do m = 1, nup
+                  Y_mi = Y_u(m,i)
+                  do j = 1, nup
+                    amatu(j,i) = amatu(j,i) + slmfui(j,m,idet) * Y_mi
+                  enddo
+                enddo
+              enddo
+              
               jparm0 = 0
               do jt = 1, notype
                 do jp = 1, iabs(nparmo(jt))
                   jparm0 = jparm0 + 1
                   if (jparm0 .le. iparm0) then ! symmetry of Hessian
-                    if (jp .eq. ip) then
+                    jp_mapped = iwo(jp,jt)
+                    
+                    ! Fully hoisted conditional logic restores original math cross-terms
+                    if (jp_mapped .eq. ip_mapped) then
                       do i = 1, nup
                         do j = 1, nup
                           detuij(jparm0,idet) = detuij(jparm0,idet) &
-     &                       + slmfui(j,i,idet) * d2porb(it,jt,jp,i,iworbdup(j,idet)) &
-     &                       - amatu(j,i) * dporb(jt,jp,i,iworbdup(j,idet))
+     &                       + slmfui(j,i,idet) * d2porb(it,jt,jp_mapped,i,iworbdup(j,idet)) &
+     &                       - amatu(j,i) * dporb(jt,jp_mapped,i,iworbdup(j,idet))
                         enddo
                       enddo
                     else
                       do i = 1, nup
                         do j = 1, nup
                           detuij(jparm0,idet) = detuij(jparm0,idet) &
-     &                       - amatu(j,i) * dporb(jt,jp,i,iworbdup(j,idet))
+     &                       - amatu(j,i) * dporb(jt,jp_mapped,i,iworbdup(j,idet))
                         enddo
                       enddo
-                    endif ! jp .eq. ip
+                    endif ! jp_mapped .eq. ip_mapped
                   endif ! jparm0 .le. iparm0
-                enddo ! jt
-              enddo ! jp
+                enddo ! jp
+              enddo ! jt
             endif ! iopt
 
           enddo ! idet (up electrons)
           
-          
           ! Down electrons
           do idet = 1, ndetdn
           
-            ! Constract A^-1 * dA * A^-1
-            amattempd = 0
-            do k = 1, ndn
-              do j = 1, ndn
-                do i = 1, ndn
-                  amattempd(i,j) = amattempd(i,j) + slmfdi(i,j,idet) * dporb(it,ip,j+nup,iworbddn(k,idet))
-                enddo
-              enddo
-            enddo
-            amatd = 0
-            do k = 1, ndn
-              do j = 1, ndn
-                do i = 1, ndn
-                  amatd(i,j) = amatd(i,j) + amattempd(i,j) * slmfdi(j,k,idet)
+            ! Form intermediate matrix Y^(alpha) = (d_alpha A) A^-1
+            Y_d = 0.0d0
+            do i = 1, ndn
+              do m = 1, ndn
+                S_mi = slmfdi(m,i,idet)
+                iorb_m = iworbddn(m,idet)
+                do j = 1, ndn
+                  Y_d(j,i) = Y_d(j,i) + dporb(it, ip_mapped, j+nup, iorb_m) * S_mi
                 enddo
               enddo
             enddo
             
             ! First parameter derivatives
             do i = 1, ndn
-              do j = 1, ndn
-                detdi(iparm0,idet) = detdi(iparm0,idet) &
-     &             + slmfdi(j,i,idet) * dporb(it,ip,i+nup,iworbddn(j,idet))
-              enddo
+              detdi(iparm0,idet) = detdi(iparm0,idet) + Y_d(i,i)
             enddo
 
-            ! Velocity of first parameter derivatives
+            ! Velocity and Laplacian using O(N^2) trace collapse
             do ie = 1, ndn
+              sum_p_accu(1:ndim) = 0.0d0
+              sum_p_accul = 0.0d0
               do j = 1, ndn
-                do idim=1,ndim
-                  ddetdi(idim,ie,idet) = ddetdi(idim,ie,idet) &
-     &               + ddporb(idim,it,ip,ie+nup,iworbddn(j,idet)) * slmfdi(j,ie,idet) &
-     &               - dorb(idim,ie+nup,iworbddn(j,idet)) * amatd(j,ie)
+                Y_val = Y_d(j, ie)
+                do idim = 1, ndim
+                  sum_p_accu(idim) = sum_p_accu(idim) + Y_val * D_veld(idim, ie, j, idet)
                 enddo
+                sum_p_accul = sum_p_accul + Y_val * D_lapd(ie, j, idet)
               enddo
-            enddo
-            
-            ! Laplacian of first parameter derivatives
-            do ie = 1, ndn
-              do j = 1, ndn
-                d2detdi(idet) = d2detdi(idet) &
-     &             + d2dporb(it,ip,ie+nup,iworbddn(j,idet)) * slmfdi(j,ie,idet) &
-     &             - ddorb(ie+nup,iworbddn(j,idet)) * amatd(j,ie)
+              
+              sum_d_mat(1:ndim) = 0.0d0
+              sum_d_matl = 0.0d0
+              do m = 1, ndn
+                S_mi = slmfdi(m, ie, idet)
+                iorb_m = iworbddn(m, idet)
+                do idim = 1, ndim
+                  sum_d_mat(idim) = sum_d_mat(idim) + ddporb(idim, it, ip_mapped, ie+nup, iorb_m) * S_mi
+                enddo
+                sum_d_matl = sum_d_matl + d2dporb(it, ip_mapped, ie+nup, iorb_m) * S_mi
               enddo
+              
+              do idim = 1, ndim
+                ddetdi(idim, ie, idet) = ddetdi(idim, ie, idet) + sum_d_mat(idim) - sum_p_accu(idim)
+              enddo
+              d2detdi(idet)       = d2detdi(idet)       + sum_d_matl - sum_p_accul
             enddo
             
             ! Second parameter derivatives if doing newton
             if (iopt .eq. 2) then
+              amatd = 0.0d0
+              do i = 1, ndn
+                do m = 1, ndn
+                  Y_mi = Y_d(m,i)
+                  do j = 1, ndn
+                    amatd(j,i) = amatd(j,i) + slmfdi(j,m,idet) * Y_mi
+                  enddo
+                enddo
+              enddo
+              
               jparm0 = 0
               do jt = 1, notype
                 do jp = 1, iabs(nparmo(jt))
                   jparm0 = jparm0 + 1
                   if (jparm0 .le. iparm0) then ! symmetry of Hessian
-                    if (jp .eq. ip) then
+                    jp_mapped = iwo(jp,jt)
+                    
+                    if (jp_mapped .eq. ip_mapped) then
                       do i = 1, ndn
                         do j = 1, ndn
                           detdij(jparm0,idet) = detdij(jparm0,idet) &
-     &                       + slmfdi(i,j,idet) * d2porb(it,jt,jp,i+nup,iworbddn(j,idet)) &
-     &                       - amatd(j,i) * dporb(jt,jp,i+nup,iworbddn(j,idet))
+     &                       + slmfdi(j,i,idet) * d2porb(it,jt,jp_mapped,i+nup,iworbddn(j,idet)) &
+     &                       - amatd(j,i) * dporb(jt,jp_mapped,i+nup,iworbddn(j,idet))
                         enddo
                       enddo
                     else
                       do i = 1, ndn
                         do j = 1, ndn
                           detdij(jparm0,idet) = detdij(jparm0,idet) &
-     &                       - amatd(j,i) * dporb(jt,jp,i+nup,iworbddn(j,idet))
+     &                       - amatd(j,i) * dporb(jt,jp_mapped,i+nup,iworbddn(j,idet))
                         enddo
                       enddo
-                    endif ! jp .eq. ip
+                    endif ! jp_mapped .eq. ip_mapped
                   endif ! jparm0 .le. iparm0
-                enddo ! jt
-              enddo ! jp
+                enddo ! jp
+              enddo ! jt
             endif ! iopt
           
           enddo ! idet (down electrons)
-          
           
 ! now put determinants together to get the final results:
           iparm=iparm0+nparmcsf
@@ -647,50 +717,73 @@
 
               idet=iwdet_in_csf(idet_in_csf,icsf)
 
+              ! Completely unswitch branch based on ndn
               if(ndn.ge.1) then
-                term=detu(iwdetup(idet))*detd(iwdetdn(idet))*csf_coef(icsf,iwf)*cdet_in_csf(idet_in_csf,icsf)
-              else
-                term=detu(iwdetup(idet))*csf_coef(icsf,iwf)*cdet_in_csf(idet_in_csf,icsf)
-              endif
-              term=term*detinv
-              
-              deti_det(iparm)=deti_det(iparm)+ &
+                term=detu(iwdetup(idet))*detd(iwdetdn(idet))*csf_coef(icsf,iwf)*cdet_in_csf(idet_in_csf,icsf)*detinv
+                deti_det(iparm)=deti_det(iparm)+ &
      &                 (detui(iparm0,iwdetup(idet))+detdi(iparm0,iwdetdn(idet)))*term
-     
-              d2deti_det(iparm) = d2deti_det(iparm) + term * (d2detui(iwdetup(idet)) + d2detdi(iwdetdn(idet)))
+                d2deti_det(iparm) = d2deti_det(iparm) + term * (d2detui(iwdetup(idet)) + d2detdi(iwdetdn(idet)))
 
-              do i = 1, nup
-                iwdet = iwdetup(idet)
-                do k = 1, ndim
-                  ddeti_det(k,i,iparm) = ddeti_det(k,i,iparm) + term &
-     &              * (ddetui(k,i,iwdet) + ddeti_deti(k,i,iwdet) &
+                do i = 1, nup
+                  iwdet = iwdetup(idet)
+                  do idim = 1, ndim
+                    ddeti_det(idim,i,iparm) = ddeti_det(idim,i,iparm) + term &
+     &              * (ddetui(idim,i,iwdet) + ddeti_deti(idim,i,iwdet) &
      &              * (detui(iparm0,iwdetup(idet)) + detdi(iparm0,iwdetdn(idet)))) 
-                enddo
-                d2deti_det(iparm) = d2deti_det(iparm) &
+                  enddo
+                  d2deti_det(iparm) = d2deti_det(iparm) &
      &            + term * (d2edeti_deti(i,iwdet) &
      &            * (detui(iparm0,iwdetup(idet)) + detdi(iparm0,iwdetdn(idet))))
-              enddo
-              do i = nup + 1, nelec
-                iwdet = iwdetdn(idet)
-                do k = 1, ndim
-                  ddeti_det(k,i,iparm) = ddeti_det(k,i,iparm) + term &
-     &              * (ddetdi(k,i-nup,iwdet) + ddeti_deti(k,i,iwdet) &
-     &              * (detui(iparm0,iwdetup(idet)) + detdi(iparm0,iwdetdn(idet))))
                 enddo
-                d2deti_det(iparm) = d2deti_det(iparm) &
-     &            + term * (d2edeti_deti(i,iwdet) &
-     &            * (detui(iparm0,iwdetup(idet)) + detdi(iparm0,iwdetdn(idet))))
-              enddo
 
-              if (iopt .eq. 2) then
-                do jparm0=1,iparm0
-                  jparm=jparm0+nparmcsf
-                  detij_det(iparm,jparm) = detij_det(iparm,jparm) + term &
+                do i = nup + 1, nelec
+                  iwdet = iwdetdn(idet)
+                  do idim = 1, ndim
+                    ddeti_det(idim,i,iparm) = ddeti_det(idim,i,iparm) + term &
+     &              * (ddetdi(idim,i-nup,iwdet) + ddeti_deti(idim,i,iwdet) &
+     &              * (detui(iparm0,iwdetup(idet)) + detdi(iparm0,iwdetdn(idet))))
+                  enddo
+                  d2deti_det(iparm) = d2deti_det(iparm) &
+     &            + term * (d2edeti_deti(i,iwdet) &
+     &            * (detui(iparm0,iwdetup(idet)) + detdi(iparm0,iwdetdn(idet))))
+                enddo
+
+                if (iopt .eq. 2) then
+                  do jparm0=1,iparm0
+                    jparm=jparm0+nparmcsf
+                    detij_det(iparm,jparm) = detij_det(iparm,jparm) + term &
      &              * (detuij(jparm0,iwdetup(idet)) + detdij(jparm0,iwdetdn(idet)) &
      &              + (detui(iparm0,iwdetup(idet)) + detdi(iparm0,iwdetdn(idet))) &
      &              * (detui(jparm0,iwdetup(idet)) + detdi(jparm0,iwdetdn(idet))))
-                  detij_det(jparm,iparm)=detij_det(iparm,jparm)
+                    detij_det(jparm,iparm)=detij_det(iparm,jparm)
+                  enddo
+                endif
+              else
+                term=detu(iwdetup(idet))*csf_coef(icsf,iwf)*cdet_in_csf(idet_in_csf,icsf)*detinv
+                deti_det(iparm)=deti_det(iparm)+detui(iparm0,iwdetup(idet))*term
+                d2deti_det(iparm) = d2deti_det(iparm) + term * d2detui(iwdetup(idet))
+
+                do i = 1, nup
+                  iwdet = iwdetup(idet)
+                  do idim = 1, ndim
+                    ddeti_det(idim,i,iparm) = ddeti_det(idim,i,iparm) + term &
+     &              * (ddetui(idim,i,iwdet) + ddeti_deti(idim,i,iwdet) &
+     &              * detui(iparm0,iwdetup(idet))) 
+                  enddo
+                  d2deti_det(iparm) = d2deti_det(iparm) &
+     &            + term * (d2edeti_deti(i,iwdet) &
+     &            * detui(iparm0,iwdetup(idet)))
                 enddo
+
+                if (iopt .eq. 2) then
+                  do jparm0=1,iparm0
+                    jparm=jparm0+nparmcsf
+                    detij_det(iparm,jparm) = detij_det(iparm,jparm) + term &
+     &              * (detuij(jparm0,iwdetup(idet)) &
+     &              + detui(iparm0,iwdetup(idet)) * detui(jparm0,iwdetup(idet)))
+                    detij_det(jparm,iparm)=detij_det(iparm,jparm)
+                  enddo
+                endif
               endif
               
             enddo ! idet_in_csf
@@ -698,7 +791,6 @@
         
         enddo ! ip
       enddo ! it
-
 
       return
       end
@@ -708,6 +800,7 @@
 
       subroutine constrained_deriv_det_orb(dporb,d2porb,ddporb,d2dporb)
 ! Created: Gokhan Oztarhan, Oct 2023
+! Modified: Gokhan Oztarhan, Aug 2026
 
 ! Calculates the summation of basis function derivatives 
 ! if they are constrained to be equal (or equal with minus sign).
@@ -736,40 +829,65 @@
       use contrl_opt_mod
       implicit real*8(a-h,o-z)
       
-      ! arguments
+! arguments
       dimension dporb(notype,nbasis,nelec,norb),d2porb(notype,notype,nbasis,nelec,norb)
       dimension ddporb(3,notype,nbasis,nelec,norb),d2dporb(notype,nbasis,nelec,norb)
       
       do it = 1, notype
         do ip = 1, norb_constraints(it)
         
-          consgn = real(sign(1,orb_constraints(it,ip,2)))
-          
+          consgn = sign(1.0d0, dble(orb_constraints(it,ip,2)))
           ipcon2 = iabs(orb_constraints(it,ip,2))
-        
-          do iorb = 1, norb
+          ipcon1 = orb_constraints(it,ip,1)
+          
+          if (coef_is_diag) then
+            ! >>> MASSIVE SPEEDUP: OVERWRITE MODE (NO ZEROING REQUIRED) <<<
+            iorb = ipcon1
             do ie = 1, nelec
-              dporb(it,ipcon2,ie,iorb) = &
-     &          dporb(it,ipcon2,ie,iorb) &
-     &          + consgn * dporb(it,orb_constraints(it,ip,1),ie,iorb)
-     
+              dporb(it,ipcon2,ie,iorb) = consgn * dporb(it,ipcon1,ie,iorb)
               do idim = 1, ndim
-                ddporb(idim,it,ipcon2,ie,iorb) = &
-     &            ddporb(idim,it,ipcon2,ie,iorb) &
-     &            + consgn * ddporb(idim,it,orb_constraints(it,ip,1),ie,iorb)
+                ddporb(idim,it,ipcon2,ie,iorb) = consgn * ddporb(idim,it,ipcon1,ie,iorb)
               enddo
-              
-              d2dporb(it,ipcon2,ie,iorb) = &
-     &          d2dporb(it,ipcon2,ie,iorb) &
-     &          + consgn * d2dporb(it,orb_constraints(it,ip,1),ie,iorb)
-     
-              do jt = 1, notype
-                d2porb(it,jt,ipcon2,ie,iorb) = &
-     &            d2porb(it,jt,ipcon2,ie,iorb) &
-     &            + consgn * d2porb(it,jt,orb_constraints(it,ip,1),ie,iorb)
-              enddo
-            enddo ! ie
-          enddo ! iorb
+              d2dporb(it,ipcon2,ie,iorb) = consgn * d2dporb(it,ipcon1,ie,iorb)
+            enddo 
+            do jt = 1, notype
+              if (it .eq. jt) then
+                 do ie = 1, nelec
+                   d2porb(it,jt,ipcon2,ie,iorb) = consgn * consgn * d2porb(it,jt,ipcon1,ie,iorb)
+                 enddo
+              else
+                 do ie = 1, nelec
+                   d2porb(it,jt,ipcon2,ie,iorb) = consgn * d2porb(it,jt,ipcon1,ie,iorb)
+                 enddo
+              endif
+            enddo 
+          else
+            ! >>> DENSE FALLBACK: ACCUMULATION (+) <<<
+            do iorb = 1, norb
+              do ie = 1, nelec
+                dporb(it,ipcon2,ie,iorb) = dporb(it,ipcon2,ie,iorb) + consgn * dporb(it,ipcon1,ie,iorb)
+                do idim = 1, ndim
+                  ddporb(idim,it,ipcon2,ie,iorb) = ddporb(idim,it,ipcon2,ie,iorb) + consgn * ddporb(idim,it,ipcon1,ie,iorb)
+                enddo
+                d2dporb(it,ipcon2,ie,iorb) = d2dporb(it,ipcon2,ie,iorb) + consgn * d2dporb(it,ipcon1,ie,iorb)
+              enddo 
+            enddo 
+            do jt = 1, notype
+              if (it .eq. jt) then
+                 do iorb = 1, norb
+                   do ie = 1, nelec
+                     d2porb(it,jt,ipcon2,ie,iorb) = d2porb(it,jt,ipcon2,ie,iorb) + consgn * consgn * d2porb(it,jt,ipcon1,ie,iorb)
+                   enddo
+                 enddo
+              else
+                 do iorb = 1, norb
+                   do ie = 1, nelec
+                     d2porb(it,jt,ipcon2,ie,iorb) = d2porb(it,jt,ipcon2,ie,iorb) + consgn * d2porb(it,jt,ipcon1,ie,iorb)
+                   enddo
+                 enddo
+              endif
+            enddo 
+          endif
           
         enddo ! ip
       enddo ! it

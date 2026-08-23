@@ -29,7 +29,7 @@
 
       dimension x(3,*)
       real*8 rsq_temp, pot_temp !NC
-      
+
 !  pe from nucleus-nucleus repulsion
       pe=pecent
       if(iperiodic.eq.0) then
@@ -118,7 +118,7 @@
               pe_en=pe_en + dexp(-((r_en(i,ic)*r_en(i,ic))/(gndot_rho*gndot_rho))**gndot_s) !GO
             endif
    26   continue
-   
+
       if(nloc.eq.-7) then !GO
         pe_en = pe_en * gndot_v0
         if (gndot_k .ne. 0.d0) then
@@ -126,7 +126,7 @@
                 pe_en = pe_en + gndot_k * (x(1,i)*x(1,i) + x(2,i)*x(2,i))
             end do
         end if
-      end if 
+      end if
 
       if(nloc.eq.-8) then !NC
         do i=1, nelec
