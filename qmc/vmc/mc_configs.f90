@@ -42,7 +42,7 @@
       use dim_mod
       use pairden_mod
       use site_pref_mod
-      
+
       implicit real*8(a-h,o-z)
 
       dimension nsite(ncent)

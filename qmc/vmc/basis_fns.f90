@@ -1004,7 +1004,7 @@
       end
 !--------------------------------------------------------------------------
 
-      subroutine basis_fns_polargauss(iel,rvec_en,r_en)
+      subroutine basis_fns_polargauss_old(iel,rvec_en,r_en)
 
 ! Written by A.D.Guclu, Jan 2007
 ! 2-dimensional localized gaussian basis set in polar coordinates
@@ -1165,7 +1165,7 @@
       end
 
 !-------------------------------------------------------------------------
-      subroutine deriv_polargauss(rvec_en,r_en)
+      subroutine deriv_polargauss_old(rvec_en,r_en)
 
 ! Written by A.D.Guclu, Jan 2007
 ! 2-dimensional localized gaussian basis set in polar coordinates
@@ -1331,6 +1331,330 @@
       return
       end
 
+!-------------------------------------------------------------------------
+
+      subroutine basis_fns_polargauss(iel,rvec_en,r_en)
+! Written by Gokhan Oztarhan, Aug 2026
+
+! 2-dimensional localized anisotropic gaussian basis set in polar coordinates
+! Replaces the polar origin singularity with a pure Cartesian representation.
+
+! Main purpose is the study 2d wigner crystals.
+
+! arguments: iel=0 -> all electron
+!               >0 -> only electron iel
+!            rvec_en=vector electron-nucleus
+!                    (or electron-dot center in this context)
+
+! output: phin,dphin, and d2phin are calculated
+
+! Wave functions are given by:
+
+! For the central dot orbital (when xg1 < 1.d-6 / dsqrt(we)):
+! phi = fnorm * exp(-we*xg3/2 * (x1^2 + x2^2))
+
+! For the ring orbitals:
+! phi = fnorm * exp(-we*xg3/2 * dr^2) * exp(-we*xg4/2 * dt^2)
+
+! where  dr and dt are local Cartesian coordinates projected onto the 
+!        radial and tangential axes of the basis function center:
+!        dr =  (x1-X0)*cos(xg2) + (x2-Y0)*sin(xg2)
+!        dt = -(x1-X0)*sin(xg2) + (x2-Y0)*cos(xg2)
+
+!        and X0 = xg1*cos(xg2) and Y0 = xg1*sin(xg2) are the Cartesian 
+!        coordinates of the basis function.
+
+!        xg1 = radial distance to basis center (R0)
+!        xg2 = angular position of basis center (theta0)
+!        xg3 = radial width parameter (in units of we)
+!        xg4 = angular width parameter (in units of we)
+
+!        and X0 = xg1we_pgs*cos(xg2) and Y0 = xg1we_pgs*sin(xg2) are the Cartesian 
+!        coordinates of the basis function scaled by the Wigner length.
+
+      use atom_mod
+      use coefs_mod
+      use const_mod
+      use wfsec_mod
+      use phifun_mod
+      use orbpar_mod
+      implicit real*8(a-h,o-z)
+
+      common /dot/ w0,we,bext,emag,emaglz,emagsz,glande,p1,p2,p3,p4,rring
+
+      dimension rvec_en(3,nelec,*),r_en(nelec,*)
+
+      if(iel.eq.0) then
+        nelec1=1
+        nelec2=nelec
+      else
+        nelec1=iel
+        nelec2=iel
+      endif
+
+      ic=1
+      ! Scale-invariant cutoff for central orbital
+      xg1cut_pgs = 1.d-6 / dsqrt(we)
+      
+      ! >>> PHYSICAL WIGNER SCALING <<<
+      scale_r = we**(-2.d0/3.d0)
+
+      do ie=nelec1,nelec2
+        x1=rvec_en(1,ie,ic) + cent(1,ic)
+        x2=rvec_en(2,ie,ic) + cent(2,ic)
+        r2_pgs = x1*x1 + x2*x2
+
+        do ib=1,nbasis
+          ! Evaluate physical radius from dimensionless parameter
+          xg1=oparm(1,ib,iwf)
+          xg1we_pgs = xg1 * scale_r
+          xg2=oparm(2,ib,iwf)
+          xg3=oparm(3,ib,iwf)
+          xg4=oparm(4,ib,iwf)
+          
+          wez_pgs = we * xg3
+          wt_pgs  = we * xg4
+
+          if (xg1we_pgs .lt. xg1cut_pgs) then
+            ! --- STRICT ISOTROPIC CENTRAL DOT ---
+            ! Uses exact 2D isotropic norm, ignores xg4 completely
+            fnorm_pgs = dsqrt(wez_pgs)
+            
+            phin(ib,ie) = fnorm_pgs * dexp(-0.5d0*wez_pgs*r2_pgs)
+            
+            dphin(1,ib,ie) = -wez_pgs * x1 * phin(ib,ie)
+            dphin(2,ib,ie) = -wez_pgs * x2 * phin(ib,ie)
+            d2phin(ib,ie)  = wez_pgs * (wez_pgs*r2_pgs - 2.d0) * phin(ib,ie)
+          
+          else
+            ! --- SCALE-INVARIANT TANGENT ELLIPSE FOR RINGS ---
+            ! Safe geometric mean norm for bound rings
+            fnorm_pgs = dsqrt(dsqrt(wez_pgs * wt_pgs))
+            
+            c0_pgs = dcos(xg2)
+            s0_pgs = dsin(xg2)
+            
+            dx_pgs = x1 - xg1we_pgs*c0_pgs
+            dy_pgs = x2 - xg1we_pgs*s0_pgs
+            
+            dr_pgs =  dx_pgs*c0_pgs + dy_pgs*s0_pgs
+            dt_pgs = -dx_pgs*s0_pgs + dy_pgs*c0_pgs
+            
+            phin(ib,ie) = fnorm_pgs * dexp(-0.5d0*wez_pgs*dr_pgs*dr_pgs &
+     &                                     -0.5d0*wt_pgs*dt_pgs*dt_pgs)
+
+            Px_pgs = -wez_pgs*dr_pgs*c0_pgs + wt_pgs*dt_pgs*s0_pgs
+            Py_pgs = -wez_pgs*dr_pgs*s0_pgs - wt_pgs*dt_pgs*c0_pgs
+            dlap_pgs = -wez_pgs - wt_pgs
+
+            dphin(1,ib,ie) = Px_pgs * phin(ib,ie)
+            dphin(2,ib,ie) = Py_pgs * phin(ib,ie)
+
+            d2phin(ib,ie) = (dlap_pgs + Px_pgs*Px_pgs + Py_pgs*Py_pgs) * phin(ib,ie)
+          endif
+
+        enddo
+      enddo
+
+      phimax=maxval(abs(phin))
+
+      do ie=nelec1,nelec2
+        phicolmax=maxval(abs(phin(:,ie)))
+        if(phicolmax.lt.1.d-100*phimax) write(6,'(''Warning: ie, phicolmax, phimax='',i5,9e12.4)')  ie, phicolmax, phimax
+        if(phicolmax.eq.0.d0) then
+          write(6,'(''Warning stop: ie, phicolmax, phimax='',i5,9e12.4)')  ie, phicolmax, phimax
+          stop 'phicolmax = 0'
+        endif
+      enddo
+
+      return
+      end
+
+
+!-------------------------------------------------------------------------
+
+      subroutine deriv_polargauss(rvec_en,r_en)
+! Written by Gokhan Oztarhan, Aug 2026
+
+! 2-dimensional localized anisotropic gaussian basis set in polar coordinates
+! Replaces the polar origin singularity with a pure Cartesian representation.
+
+! Main purpose is the study 2d wigner crystals.
+
+      use atom_mod
+      use coefs_mod
+      use const_mod
+      use wfsec_mod
+      use phifun_mod
+      use orbpar_mod
+      use deriv_phifun_mod
+      implicit real*8(a-h,o-z)
+
+      common /dot/ w0,we,bext,emag,emaglz,emagsz,glande,p1,p2,p3,p4,rring
+
+      dimension rvec_en(3,nelec,*),r_en(nelec,*)
+
+      nelec1=1
+      nelec2=nelec
+      ic=1
+      
+      ! Scale-invariant cutoff for central orbital
+      xg1cut_pgs = 1.d-6 / dsqrt(we)
+      
+      ! >>> PHYSICAL WIGNER SCALING <<<
+      scale_r = we**(-2.d0/3.d0)
+
+      do ie=nelec1,nelec2
+        x1=rvec_en(1,ie,ic) + cent(1,ic)
+        x2=rvec_en(2,ie,ic) + cent(2,ic)
+        r2_pgs = x1*x1 + x2*x2
+
+        do ib=1,nbasis
+          ! Evaluate physical radius from dimensionless parameter
+          xg1=oparm(1,ib,iwf)
+          xg1we_pgs = xg1 * scale_r
+          xg2=oparm(2,ib,iwf)
+          xg3=oparm(3,ib,iwf)
+          xg4=oparm(4,ib,iwf)
+          
+          wez_pgs = we * xg3
+          wt_pgs  = we * xg4
+
+          if (xg1we_pgs .lt. xg1cut_pgs) then
+            ! --- STRICT ISOTROPIC CENTRAL DOT ---
+            fnorm_pgs = dsqrt(wez_pgs)
+            c3_pgs = 0.5d0 / xg3
+            
+            phin(ib,ie) = fnorm_pgs * dexp(-0.5d0*wez_pgs*r2_pgs)
+            dphin(1,ib,ie) = -wez_pgs * x1 * phin(ib,ie)
+            dphin(2,ib,ie) = -wez_pgs * x2 * phin(ib,ie)
+            d2phin(ib,ie)  = wez_pgs * (wez_pgs*r2_pgs - 2.d0) * phin(ib,ie)
+            
+            dparam(:,ib,ie) = 0.d0
+            d2param(:,:,ib,ie) = 0.d0
+            ddparam(:,:,ib,ie) = 0.d0
+            d2dparam(:,ib,ie) = 0.d0
+            
+            P3_pgs = -0.5d0 * we * r2_pgs
+            P3x_pgs = -we * x1
+            P3y_pgs = -we * x2
+            dlap3_pgs = -2.d0 * we
+            
+            dparam(3,ib,ie) = (c3_pgs + P3_pgs) * phin(ib,ie)
+            d2param(3,3,ib,ie) = (-0.5d0 / (xg3*xg3)) * phin(ib,ie) + (c3_pgs + P3_pgs) * dparam(3,ib,ie)
+            
+            ddparam(1,3,ib,ie) = P3x_pgs * phin(ib,ie) + (c3_pgs + P3_pgs) * dphin(1,ib,ie)
+            ddparam(2,3,ib,ie) = P3y_pgs * phin(ib,ie) + (c3_pgs + P3_pgs) * dphin(2,ib,ie)
+            
+            d2dparam(3,ib,ie) = (dlap3_pgs + 2.d0*(-wez_pgs*x1)*P3x_pgs + 2.d0*(-wez_pgs*x2)*P3y_pgs) * phin(ib,ie) &
+                              + (c3_pgs + P3_pgs) * d2phin(ib,ie)
+          else
+            ! --- SCALE-INVARIANT TANGENT ELLIPSE FOR RINGS ---
+            fnorm_pgs = dsqrt(dsqrt(wez_pgs * wt_pgs))
+            c3_pgs = 0.25d0 / xg3
+            c4_pgs = 0.25d0 / xg4
+            
+            c0_pgs = dcos(xg2)
+            s0_pgs = dsin(xg2)
+            dx_pgs = x1 - xg1we_pgs*c0_pgs
+            dy_pgs = x2 - xg1we_pgs*s0_pgs
+            dr_pgs = dx_pgs*c0_pgs + dy_pgs*s0_pgs
+            dt_pgs = -dx_pgs*s0_pgs + dy_pgs*c0_pgs
+            
+            phin(ib,ie) = fnorm_pgs * dexp(-0.5d0*wez_pgs*dr_pgs*dr_pgs - 0.5d0*wt_pgs*dt_pgs*dt_pgs)
+            
+            Px_pgs = -wez_pgs*dr_pgs*c0_pgs + wt_pgs*dt_pgs*s0_pgs
+            Py_pgs = -wez_pgs*dr_pgs*s0_pgs - wt_pgs*dt_pgs*c0_pgs
+            dlap_pgs = -wez_pgs - wt_pgs
+            
+            dphin(1,ib,ie) = Px_pgs * phin(ib,ie)
+            dphin(2,ib,ie) = Py_pgs * phin(ib,ie)
+            d2phin(ib,ie) = (dlap_pgs + Px_pgs*Px_pgs + Py_pgs*Py_pgs) * phin(ib,ie)
+            
+            ! 1st derivatives (P1 absorbs scale_r for dimensionless optimization)
+            P1_pgs = wez_pgs*dr_pgs*scale_r
+            P2_pgs = -wez_pgs*dr_pgs*dt_pgs + wt_pgs*dt_pgs*(dr_pgs + xg1we_pgs)
+            P3_pgs = -0.5d0*we*dr_pgs*dr_pgs
+            P4_pgs = -0.5d0*we*dt_pgs*dt_pgs
+            
+            dparam(1,ib,ie) = P1_pgs * phin(ib,ie)
+            dparam(2,ib,ie) = P2_pgs * phin(ib,ie)
+            dparam(3,ib,ie) = (c3_pgs + P3_pgs) * phin(ib,ie)
+            dparam(4,ib,ie) = (c4_pgs + P4_pgs) * phin(ib,ie)
+            
+            ! 2nd derivatives (P11 absorbs scale_r^2, P12 & P13 absorb scale_r)
+            P11_pgs = -wez_pgs * scale_r * scale_r
+            P12_pgs = wez_pgs*dt_pgs * scale_r
+            P13_pgs = we*dr_pgs * scale_r
+            P14_pgs = 0.d0
+            
+            P22_pgs = -wez_pgs*(dt_pgs*dt_pgs - dr_pgs*dr_pgs - dr_pgs*xg1we_pgs) &
+     &                + wt_pgs*(dt_pgs*dt_pgs - (dr_pgs + xg1we_pgs)**2)
+            P23_pgs = -we*dr_pgs*dt_pgs
+            P24_pgs = we*dt_pgs*(dr_pgs + xg1we_pgs)
+            
+            d2param(1,1,ib,ie) = P11_pgs * phin(ib,ie) + P1_pgs * dparam(1,ib,ie)
+            d2param(1,2,ib,ie) = P12_pgs * phin(ib,ie) + P1_pgs * dparam(2,ib,ie)
+            d2param(1,3,ib,ie) = P13_pgs * phin(ib,ie) + P1_pgs * dparam(3,ib,ie)
+            d2param(1,4,ib,ie) = P14_pgs * phin(ib,ie) + P1_pgs * dparam(4,ib,ie)
+            
+            d2param(2,2,ib,ie) = P22_pgs * phin(ib,ie) + P2_pgs * dparam(2,ib,ie)
+            d2param(2,3,ib,ie) = P23_pgs * phin(ib,ie) + P2_pgs * dparam(3,ib,ie)
+            d2param(2,4,ib,ie) = P24_pgs * phin(ib,ie) + P2_pgs * dparam(4,ib,ie)
+            
+            d2param(3,3,ib,ie) = (-0.25d0 / (xg3*xg3)) * phin(ib,ie) + (c3_pgs + P3_pgs) * dparam(3,ib,ie)
+            d2param(3,4,ib,ie) = (c3_pgs + P3_pgs) * dparam(4,ib,ie)
+            d2param(4,4,ib,ie) = (-0.25d0 / (xg4*xg4)) * phin(ib,ie) + (c4_pgs + P4_pgs) * dparam(4,ib,ie)
+            
+            d2param(2,1,ib,ie) = d2param(1,2,ib,ie)
+            d2param(3,1,ib,ie) = d2param(1,3,ib,ie)
+            d2param(4,1,ib,ie) = d2param(1,4,ib,ie)
+            d2param(3,2,ib,ie) = d2param(2,3,ib,ie)
+            d2param(4,2,ib,ie) = d2param(2,4,ib,ie)
+            d2param(4,3,ib,ie) = d2param(3,4,ib,ie)
+            
+            ! Mixed spatial-parameter derivatives (P1x and P1y absorb scale_r)
+            P1x_pgs = wez_pgs*c0_pgs * scale_r
+            P1y_pgs = wez_pgs*s0_pgs * scale_r
+            
+            P2x_pgs = -wez_pgs*(c0_pgs*dt_pgs - dr_pgs*s0_pgs) + wt_pgs*(-s0_pgs*(dr_pgs + xg1we_pgs) + dt_pgs*c0_pgs)
+            P2y_pgs = -wez_pgs*(s0_pgs*dt_pgs + dr_pgs*c0_pgs) + wt_pgs*(c0_pgs*(dr_pgs + xg1we_pgs) + dt_pgs*s0_pgs)
+            
+            P3x_pgs = -we*dr_pgs*c0_pgs
+            P3y_pgs = -we*dr_pgs*s0_pgs
+            
+            P4x_pgs = we*dt_pgs*s0_pgs
+            P4y_pgs = -we*dt_pgs*c0_pgs
+            
+            ddparam(1,1,ib,ie) = P1x_pgs * phin(ib,ie) + P1_pgs * dphin(1,ib,ie)
+            ddparam(2,1,ib,ie) = P1y_pgs * phin(ib,ie) + P1_pgs * dphin(2,ib,ie)
+            
+            ddparam(1,2,ib,ie) = P2x_pgs * phin(ib,ie) + P2_pgs * dphin(1,ib,ie)
+            ddparam(2,2,ib,ie) = P2y_pgs * phin(ib,ie) + P2_pgs * dphin(2,ib,ie)
+            
+            ddparam(1,3,ib,ie) = P3x_pgs * phin(ib,ie) + (c3_pgs + P3_pgs) * dphin(1,ib,ie)
+            ddparam(2,3,ib,ie) = P3y_pgs * phin(ib,ie) + (c3_pgs + P3_pgs) * dphin(2,ib,ie)
+            
+            ddparam(1,4,ib,ie) = P4x_pgs * phin(ib,ie) + (c4_pgs + P4_pgs) * dphin(1,ib,ie)
+            ddparam(2,4,ib,ie) = P4y_pgs * phin(ib,ie) + (c4_pgs + P4_pgs) * dphin(2,ib,ie)
+            
+            ! Laplacians d2dparam 
+            dlap1_pgs = 0.d0
+            dlap2_pgs = 0.d0
+            dlap3_pgs = -we
+            dlap4_pgs = -we
+            
+            d2dparam(1,ib,ie) = (dlap1_pgs + 2.d0*Px_pgs*P1x_pgs + 2.d0*Py_pgs*P1y_pgs) * phin(ib,ie) + P1_pgs * d2phin(ib,ie)
+            d2dparam(2,ib,ie) = (dlap2_pgs + 2.d0*Px_pgs*P2x_pgs + 2.d0*Py_pgs*P2y_pgs) * phin(ib,ie) + P2_pgs * d2phin(ib,ie)
+            d2dparam(3,ib,ie) = (dlap3_pgs + 2.d0*Px_pgs*P3x_pgs + 2.d0*Py_pgs*P3y_pgs) * phin(ib,ie) + (c3_pgs + P3_pgs) * d2phin(ib,ie)
+            d2dparam(4,ib,ie) = (dlap4_pgs + 2.d0*Px_pgs*P4x_pgs + 2.d0*Py_pgs*P4y_pgs) * phin(ib,ie) + (c4_pgs + P4_pgs) * d2phin(ib,ie)
+          endif
+
+        enddo
+      enddo
+      
+      return
+      end
 
 !-------------------------------------------------------------------------
 

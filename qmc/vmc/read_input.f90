@@ -69,7 +69,7 @@
       character*30 section
       character*10 eunit
       character*80000 input_line
-      
+
       logical insidelist !GO
 
       common /dot/ w0,we,bext,emag,emaglz,emagsz,glande,p1,p2,p3,p4,rring
@@ -152,7 +152,7 @@
 ! nloc       external potential (a positive value => nonlocal pseudopotential)
 !            -9 numerical dot potential read in from potential_num (not yet implemented)
 !            -8 gaussian sums !NC
-!            -7 gaussian dot potential, gndot_v0*dexp(-(r**2 / gndot_rho**2)**gndot_s)  !GO 
+!            -7 gaussian dot potential, gndot_v0*dexp(-(r**2 / gndot_rho**2)**gndot_s)  !GO
 !            -6 cylindrical dot potential, 0.5d0*cyldot_v*( tanh(cyldot_s*(r+cyldot_rho)) - tanh(cyldot_s*(r-cyldot_rho)) ) !GO
 !            -5 quadratic dot potential 0.5*w0^2*r^2 with barrier at center
 !                (dot_bump_height)*exp(1 - 1/(1-(x/dot_bump_radius)^2))
@@ -324,11 +324,11 @@
 !          -3: calculate full 2d pair density  AND 2d density.
 ! xfix(3)  can represent 2 different things:
 !          if ifixe>0   :  coordinates of fixed electron
-!                  -2/-3:  full pair-densities is written. 
+!                  -2/-3:  full pair-densities is written.
 !                          xfix(1) and xfix(2) are x and y coordinates of the fixed mesh point. !GO
 !                          xfix(3) is lookup intervals in degrees. Rotation angle between fixed points. !GO
 !                          For example; if xfix(3)=360 (no symmetry), only one mesh point is fixed.
-!                                       if xfix(3)=60 (hexagon symmetry) 6 mesh points are fixed, the angle between the points is 60 degrees.   
+!                                       if xfix(3)=60 (hexagon symmetry) 6 mesh points are fixed, the angle between the points is 60 degrees.
 !                                       if xfix(3)<0.6 (circular symmetry) 600 mesh points are fixed.
 ! icoosys  coordinate system for calculating 2d density/pairdensity
 !          1: cartesian
@@ -653,7 +653,7 @@
         write(6,'(''Floating Gaussian basis for 2D Wigner crystals'')')
         notype=3
       elseif(ibasis.eq.5) then
-        write(6,'(''Floating Gaussian basis for 2D Wigner crystals in ring geom.'')')
+        write(6,'(''Floating Gaussian basis for 2D Wigner crystals in polar coordinates.'')') !GO
         notype=4
       elseif(ibasis.eq.6) then
         write(6,'(''Floating, non-circular Gaussian basis for 2D Wigner crystals'')')
@@ -807,7 +807,7 @@
         write(6,'(''height cyldot pot., cyldot_v='',t31,f10.5)') cyldot_v
         write(6,'(''stiff. cyldot pot., cyldot_s='',t31,f10.5)') cyldot_s
         write(6,'(''rad. cyldot pot., cyldot_rho='',t31,f10.5)') cyldot_rho
-       elseif(nloc.eq.-7) then 
+       elseif(nloc.eq.-7) then
         read(5,*) gndot_v0,gndot_rho,gndot_s !GO
         w0 = 0.d0 ! in order to use gaussian orbitals
         bext = 0.d0 ! in order to use gaussian orbitals
@@ -856,7 +856,7 @@
           call alloc('hsf_gargs', hsf_gargs, 2, hsf_nf)
           call alloc('hsf_c', hsf_c, hsf_nf)
           call alloc('hsf_type', hsf_type, hsf_nf)
-          
+
           do i=1, hsf_nf
             write(6,'(''hsf idx='',t50, I5)') i
             read(5,*) hsf_type(i), hsf_c(i)
@@ -895,7 +895,7 @@
       ndn=nelec-nup
       write(6,'(/,''no. of electrons (all,up,dn) ='',t31,3i5)') nelec,nup,ndn
       if(nup.le.0) stop 'nup must be >=1'
-      if(nup.lt.ndn) stop 'nup must be >=ndn'
+!     if(nup.lt.ndn) stop 'nup must be >=ndn'
 
       nupdn = max(nup, ndn)
       nup_square = nup**2
@@ -936,7 +936,7 @@
       if(ndim.eq.2.and.imetro.ne.1.and.index(mode,'vmc').ne.0) &
      &stop 'imetro!=1 not yet implemented for ndim=2'
       if((nloc.eq.-8).and.(ndim.ne.gs_ndim)) stop 'gs_ndim must be equal to ndim' !NC
-     
+
       call object_modified ('ndim') ! JT
 
       if(iperiodic.eq.1) then
@@ -987,6 +987,12 @@
       write(6,'(/,''nctype,ncent ='',t31,i3,i5)') nctype,ncent
       call object_modified ('nctype')
       call object_modified ('ncent')
+
+      if (nloc .eq. -6 .or. nloc .eq. -7) then !GO
+        if (nelec .gt. 2 * ncent) then
+          stop 'nelec cannot be greater than 2 * ncent for nloc = -6 and -7'
+        endif
+      endif
 
       call alloc ('iwctype', iwctype, ncent)
       read(5,*) (iwctype(i),i=1,ncent)
@@ -1041,7 +1047,7 @@
 !       if(iperiodic.eq.3) then
 !         do 40 k=1,ndim
 !  40       cent(k,ic)=cent(k,ic)*alattice
-!       endif   
+!       endif
    50   if(iperiodic.eq.0 .or. iperiodic.eq.1) write(6,'(''center'',i4,1x,''('',3f13.5,'')'')') ic,(cent(k,ic),k=1,ndim) ! quick fix for large systems !GO
 
 ! Convert center positions from primitive lattice vector units to cartesian coordinates
@@ -1114,7 +1120,7 @@
       call object_modified('znuc_tot') !NC
       write(6,'(''znuc_tot='',f6.1,'' != nelec='',i4)') znuc_tot, nelec  ! NC
       if (nelec .le. 1 .or. nelec .gt. 2*znuc_tot) stop 'wrong number of electrons' ! NC
-      
+
       !if(abs(znuc_tot-dfloat(nelec)).gt.3) stop 'abs(znuc_tot - nelec) > 3' ! JT
 
       !if(nloc.ne.-3) then ! RM
@@ -1128,7 +1134,7 @@
         call alloc ('iwftype', iwftype, nforce)
         iwftype(1)=1
       endif
-      
+
 ! Determinantal section
       read(5,*) section
       write(6,'(/,a30,/)') section
@@ -1394,7 +1400,8 @@
         read(5,*) ltot
         write(6,'(''L_tot='',i3)') ltot
       endif
-      if(ndim.eq.2.and.(ibasis.eq.1.or.ibasis.eq.3).and.inum_orb.eq.0) call emagnetic(ltot)
+! Warning: The next line is temporarily commented out because it causes a segmentation fault (see /data/cyrus/qmc_runs/dots_Gokhan/N=10/w006/shell_3-7/FockDarwin_
+!     if(ndim.eq.2.and.(ibasis.eq.1.or.ibasis.eq.3).and.inum_orb.eq.0) call emagnetic(ltot)
 !     if(ndim.eq.2 .and. (iperiodic.eq.0 .and. nloc.ne.-4)) call emagnetic(ltot)
 !     if(ibasis.eq.2) call read_orb_pw_real
       if(ibasis.eq.2) call read_orb_pw
@@ -1470,15 +1477,15 @@
         endif
         call alloc ('a', a, nparm_read, nwf)
         read(5,*) (a(iparm,1),iparm=1,nparm_read)
-        write(6,'(''a='',x,7f10.6,(8f10.6))')(a(iparm,1),iparm=1,nparm_read)
+        write(6,'(''a='',x,(100es22.8))')(a(iparm,1),iparm=1,nparm_read)
         call alloc ('b', b, nparm_read, nspin2b-nspin1+1,nwf)
         do 280 isp=nspin1,nspin2b
           read(5,*) (b(iparm,isp,1),iparm=1,nparm_read)
-  280     write(6,'(''b='',x,7f10.6,(8f10.6))') (b(iparm,isp,1),iparm=1,nparm_read)
+  280     write(6,'(''b='',x,(100es22.8))') (b(iparm,isp,1),iparm=1,nparm_read)
         call alloc ('c', c, nparmc_read, nctype, nwf)
         do 290 it=1,nctype
           read(5,*) (c(iparm,it,1),iparm=1,nparmc_read)
-  290     write(6,'(''c='',x,7f10.6,(8f10.6))') (c(iparm,it,1),iparm=1,nparmc_read)
+  290     write(6,'(''c='',x,(100es22.8))') (c(iparm,it,1),iparm=1,nparmc_read)
         if(ifock.gt.0) then
           nfock=9
           if(ifock.eq.2) nfock=15
@@ -1516,7 +1523,7 @@
         call alloc ('a4', a4, nparma_read, nctype, nwf)
         do 301 it=1,nctype
            read(5,*) (a4(iparm,it,1),iparm=1,nparma_read)
-           write(6,'(''a='',x,7f10.6,(8f10.6))') (a4(iparm,it,1),iparm=1,nparma_read)
+           write(6,'(''a='',x,(100es22.8))') (a4(iparm,it,1),iparm=1,nparma_read)
            if(nparma_read.ge.2 .and. a4(2,it,1).lt.parm2min) then
                write(6,'(''Warning: a4(2,it,1) too low, Jastrow denom could become negative'')')
                stop 'a4(2,it,1) too low, Jastrow denom could become negative'
@@ -1525,7 +1532,7 @@
         call alloc ('b', b, nparmb_read, nspin2b-nspin1+1,nwf)
         do 302 isp=nspin1,nspin2b
           read(5,*) (b(iparm,isp,1),iparm=1,nparmb_read)
-          write(6,'(''b='',x,7f10.6,(8f10.6))') (b(iparm,isp,1),iparm=1,nparmb_read)
+          write(6,'(''b='',x,(100es22.8))') (b(iparm,isp,1),iparm=1,nparmb_read)
            if(nparmb_read.ge.2 .and. b(2,isp,1).lt.parm2min) then
              write(6,'(''Warning: b(2,isp,1) too low, Jastrow denom could become negative'')')
              stop 'b(2,isp,1) too low, Jastrow denom could become negative'
@@ -1534,7 +1541,7 @@
         call alloc ('c', c, nparmc_read, nctype, nwf)
         do 303 it=1,nctype
           read(5,*) (c(iparm,it,1),iparm=1,nparmc_read)
-  303     write(6,'(''c='',x,7f10.6,(8f10.6))') (c(iparm,it,1),iparm=1,nparmc_read)
+  303     write(6,'(''c='',x,(100es22.8))') (c(iparm,it,1),iparm=1,nparmc_read)
 ! Note: Fock terms yet to be put in ijas=4,5,6.
       endif
       call systemflush(6)
@@ -1708,9 +1715,9 @@
       if (abs(xfix(1)) .gt. xmax) stop 'abs(xfix(1)) should be less equal than xmax' !GO
       if (abs(xfix(2)) .gt. xmax) stop 'abs(xfix(2)) should be less equal than xmax'
       if ((xfix(1) .eq. 0d0) .and.  (xfix(2) .eq. 0d0) .and. xfix(3) .ne. 360) then
-        stop 'xfix(3) must be equal to 360 if xfix(1) and xfix(2) equal to 0.' 
-      end if  
-      if (xfix(3) .le. 0 .or. xfix(3) .gt. 360) stop 'xfix(3) must be 0 < xfix(3) <= 360' 
+        stop 'xfix(3) must be equal to 360 if xfix(1) and xfix(2) equal to 0.'
+      end if
+      if (xfix(3) .le. 0 .or. xfix(3) .gt. 360) stop 'xfix(3) must be 0 < xfix(3) <= 360'
       allocate(imeshfix1(0))
       allocate(imeshfix2(0))
       allocate(thetafix(0))
@@ -1721,7 +1728,7 @@
       ! Append other mesh points according to desired symmetry
       ithetafix = nint(360 / xfix(3))
       do itheta = 1, ithetafix - 1
-        thetafixtemp = pi * (itheta * xfix(3)) / 180 
+        thetafixtemp = pi * (itheta * xfix(3)) / 180
         call rotate(thetafixtemp, xfix(1), xfix(2), xfix1rot, xfix2rot)
         ixfix1rot = nint(delxi(1) * xfix1rot)
         ixfix2rot = nint(delxi(2) * xfix2rot)
@@ -1731,7 +1738,7 @@
           if (ixfix1rot .eq. imeshfix1(imesh) .and. ixfix2rot .eq. imeshfix2(imesh)) then
             insidelist = .true.
             exit
-          end if    
+          end if
         end do
         if (.not. insidelist) then
           call append(imeshfix1, ixfix1rot)
@@ -2010,7 +2017,7 @@
      &  (nparmo(it),it=1,notype)
         do it=1,notype
           nparmot=nparmot+iabs(nparmo(it))
-          if(nparmo(it).lt.(1-nbasis) .or. nparmo(it).gt.nbasis) then
+          if(nparmo(it).lt.(1-nbasis) .or. nparmo(it).gt.nbasis) then !GO
             write(6, '(''nparmo must be between (-nbasis+1) and nbasis'')')
             stop 'nparmo must be between (-nbasis+1) and nbasis'
           elseif(nparmo(it).lt.0) then  !some orbitals of type 'it' constrained
@@ -2103,6 +2110,7 @@
       if(nparme.gt.nbasis) stop 'nparme > nbasis'
       if(nparme.gt.0 .and. numr.gt.0) stop 'nparme > 0 and numr > 0'
       if(nparme.gt.0 .and. ibasis.eq.3 .and. idot.ne.0) stop 'for quantum dots, nparme.gt.0 only possible for Fock-Darwin states'
+      if(nparme.gt.0 .and. (ibasis.eq.4 .or. ibasis.eq.5)) stop 'nparme > 0' !GO
       if(nparml.lt.0 .or. nparmj.lt.0 .or. nparmcsf.lt.0 .or. nparms.lt.0 .or.nparmg.lt.0) stop 'nparm? must be >= 0'
       if(nparms.gt.1) stop 'nparms must be 0 or 1'
       nparmjs=nparmj+nparms !JT
@@ -2113,7 +2121,7 @@
 !JT      endif
       call systemflush(6)
 
-      call alloc ('iwo', iwo, norb, notype)
+      call alloc ('iwo', iwo, nbasis, notype) !GO
       do it=1,notype
         read(5,*) (iwo(iparm,it),iparm=1,iabs(nparmo(it)))
         if(nparmo(it).lt.0) then  !constrained orbital optimization
@@ -2127,6 +2135,21 @@
         enddo
       enddo
       call systemflush(6)
+
+      if (ibasis.eq.5) then !GO
+        do iparm=1,iabs(nparmo(2))
+          if (oparm(1,iwo(iparm,2),1) .eq. 0.d0) then
+            write(6,*) 'Cannot optimize angular position parameter for polar gaussian located at center.'
+            stop 'Cannot optimize angular position parameter for polar gaussian located at center.'
+          endif
+        enddo
+        do iparm=1,iabs(nparmo(4))
+          if (oparm(1,iwo(iparm,4),1) .eq. 0.d0) then
+            write(6,*) 'Cannot optimize angular width parameter for polar gaussian located at center.'
+            stop 'Cannot optimize angular width parameter for polar gaussian located at center.'
+          endif
+        enddo
+      endif
 
       call alloc ('iworb', iworb, nparml)
       call alloc ('iwbasi', iwbasi, nparml)
@@ -2253,9 +2276,9 @@
         call alloc ('norb_constraints', norb_constraints, notype)
         read(5,*) (norb_constraints(it),it=1,notype)
         write(6,'(''Number of constraints applied to each type of orbital: '',4(i4,1x))') (norb_constraints(it),it=1,notype) !GO
-        call alloc ('orb_constraints', orb_constraints, notype, nbasis-1, 2)
+        call alloc ('orb_constraints', orb_constraints, notype, nbasis-1, 2) !GO
         do it=1,notype  ! read in constraints
-          if(norb_constraints(it).lt.0 .or. norb_constraints(it).gt.(nbasis-1)) then
+          if(norb_constraints(it).lt.0 .or. norb_constraints(it).gt.(nbasis-1)) then !GO
             write(6, '(''There must be between 0 and (nbasis-1) constraints'')')
             stop 'Invalid number of constraints.'
           endif
@@ -2285,7 +2308,7 @@
           endif
           do icon=1,norb_constraints(it)  ! check that constraints are ok
             write(6,'(''Constraining orbitals: '',2i5)') (orb_constraints(it,icon,j),j=1,2)
-            if (orb_constraints(it,icon,1).le.0 .or. orb_constraints(it,icon,1).gt.nbasis) then
+            if (orb_constraints(it,icon,1).le.0 .or. orb_constraints(it,icon,1).gt.nbasis) then !GO
               write(6,'(''Constrained orbital must be between 1 and nbasis'')')
               stop 'Constrained orbital out of range'
             endif
@@ -2310,7 +2333,8 @@
                 stop 'Duplicate or conflicting constraint'
               endif
             enddo
-            consgn = real(sign(1, orb_constraints(it,icon,2)))
+            !consgn = real(sign(1, orb_constraints(it,icon,2)))
+            consgn = sign(1.0d0, dble(orb_constraints(it,icon,2)))
             oparm(it,orb_constraints(it,icon,1),1) = consgn*oparm(it,iabs(orb_constraints(it,icon,2)),1)
           enddo  ! finished check do icon=1,norbconstrain(it)
 
@@ -2350,7 +2374,7 @@
 
         endif
       endif
-      
+
       ! the default value of oparm3_max is the maximum value of a real*8 variable
       ! so that other basis sets using oparm(3,:,:) would not be affected during the optimization.
       oparm3_max = huge(oparm3_max) ! GO
