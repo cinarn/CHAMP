@@ -509,17 +509,20 @@
         endif
 
 !       1. Header: Write the parameters and Order Parameters mapped to all parsed rings
-        write(41,'("# ring_id_bff: ",i4,", M_bff: ",i4,", nrings_bff: ",i4,", conf_bff: ",20i4)') &
-     &    ring_id_bff,M_bff,nrings_bff,(conf_bff(ir),ir=1,nrings_bff)
-        write(41,'("# M-fold Order Parameters: ", 20G15.6)') (psi_M_acc_bff(ir) * alg_weight / passes, ir=1,nrings_bff)
+        write(41,'("# sub_id_bff: ",i5,", M_bff: ",i5)') sub_id_bff,M_bff
+        write(41,'("# conf_bff: ",*(i5))') conf_bff(1:nrings_bff)
+        write(41,'("# sub_conf_bff: ",*(i5))') sub_conf_bff(1:nsubrings_bff)
+        write(41,'("# MAIN shell M-fold Order Parameters: ", *(G15.6))') (psi_M_acc_bff(ir) * alg_weight / passes, ir=1,nrings_bff)
 
-        write(42,'("# ring_id_bff: ",i4,", M_bff: ",i4,", nrings_bff: ",i4,", conf_bff: ",20i4)') &
-     &    ring_id_bff,M_bff,nrings_bff,(conf_bff(ir),ir=1,nrings_bff)
-        write(42,'("# M-fold Order Parameters: ", 20G15.6)') (psi_M_acc_bff(ir) * alg_weight / passes, ir=1,nrings_bff)
+        write(42,'("# sub_id_bff: ",i5,", M_bff: ",i5)') sub_id_bff,M_bff
+        write(42,'("# conf_bff: ",*(i5))') conf_bff(1:nrings_bff)
+        write(42,'("# sub_conf_bff: ",*(i5))') sub_conf_bff(1:nsubrings_bff)
+        write(42,'("# MAIN shell M-fold Order Parameters: ", *(G15.6))') (psi_M_acc_bff(ir) * alg_weight / passes, ir=1,nrings_bff)
 
-        write(43,'("# ring_id_bff: ",i4,", M_bff: ",i4,", nrings_bff: ",i4,", conf_bff: ",20i4)') &
-     &    ring_id_bff,M_bff,nrings_bff,(conf_bff(ir),ir=1,nrings_bff)
-        write(43,'("# M-fold Order Parameters: ", 20G15.6)') (psi_M_acc_bff(ir) * alg_weight / passes, ir=1,nrings_bff)
+        write(43,'("# sub_id_bff: ",i5,", M_bff: ",i5)') sub_id_bff,M_bff
+        write(43,'("# conf_bff: ",*(i5))') conf_bff(1:nrings_bff)
+        write(43,'("# sub_conf_bff: ",*(i5))') sub_conf_bff(1:nsubrings_bff)
+        write(43,'("# MAIN shell M-fold Order Parameters: ", *(G15.6))') (psi_M_acc_bff(ir) * alg_weight / passes, ir=1,nrings_bff)
         
         ! 2. Recompute the Cartesian grid factor: Fourier output may have changed term.
         term = 1.d0/(passes*del1*del2)
@@ -551,6 +554,8 @@
           ! Same common-harmonic bounds as in bffden2d.
           range_half_bff = pi / dble(M_ir_bff)
           del_phase_bff = 2.d0 * range_half_bff / dble(NIRBINS_bff)
+          write(49,'("# Main conf_bff: ",*(i5))') conf_bff(1:nrings_bff)
+          write(49,'("# Common main-shell harmonic: ",i6)') M_ir_bff
           
           do in1_bff = 1, NIRBINS_bff
             angle_bff = -range_half_bff + (dble(in1_bff) - 0.5d0) * del_phase_bff

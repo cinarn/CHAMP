@@ -30,7 +30,7 @@
       
 ! Variables for BFF and M-fold phase correlation reduction
       double precision :: irphasetot_bff(NIRBINS_bff)
-      double precision :: work_bff(20)
+      double precision :: work_bff(nelec)
 
 
 !     err(x,x2,i)=dsqrt(abs(x2/wcum(i)-(x/wcum(i))**2)/iblk)

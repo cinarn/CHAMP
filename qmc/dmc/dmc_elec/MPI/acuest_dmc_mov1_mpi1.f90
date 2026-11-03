@@ -700,7 +700,7 @@
   105       bffden2d_d(i1,i2)=0.d0
         do 106 i1=1,NIRBINS_bff
   106     irphase_bff(i1)=0.d0
-        do 107 i1=1,20
+        do 107 i1=1,nrings_bff
   107     psi_M_acc_bff(i1)=0.d0
       endif
       if (ifourier.ne.0) then

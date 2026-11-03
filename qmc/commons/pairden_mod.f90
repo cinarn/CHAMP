@@ -16,11 +16,21 @@ module pairden_mod
  integer ifixe
  integer, parameter :: NAX = 50
  
-! Select a radial shell by index; M_bff is its derived population, not an input.
- integer :: ring_id_bff, M_bff, nrings_bff
- integer, dimension(20) :: conf_bff
+! Main radial shells and mean-radius-ranked angular sub-rings.
+! Only conf_bff, sub_conf_bff and sub_id_bff are input parameters.
+ integer :: sub_id_bff, M_bff, nrings_bff, nsubrings_bff
+ integer, allocatable :: conf_bff(:), sub_conf_bff(:)
+ integer, allocatable :: first_sub_bff(:), nsub_bff(:), sub_shell_bff(:)
  double precision, allocatable :: bffden2d_t(:,:), bffden2d_u(:,:), bffden2d_d(:,:)
- double precision :: psi_M_acc_bff(20)
+ double precision, allocatable :: psi_M_acc_bff(:)
+
+! Fixed slot angles and sequential assignment workspace, allocated once per setup.
+ double precision, allocatable :: bff_slot_cos(:,:), bff_slot_sin(:,:), bff_score(:,:)
+ double precision, allocatable :: bff_unit_x(:), bff_unit_y(:), bff_mean_radius(:)
+ double precision, allocatable :: bff_u(:), bff_v(:), bff_minv(:)
+ integer, allocatable :: bff_members(:), bff_group_order(:), bff_available(:), bff_assignment(:)
+ integer, allocatable :: bff_rows(:), bff_p(:), bff_way(:)
+ logical, allocatable :: bff_used(:), bff_visited(:)
  
 ! Variables for Inter-Ring Phase Correlation
  integer :: M_ir_bff ! Common harmonic of the two outermost shells.
