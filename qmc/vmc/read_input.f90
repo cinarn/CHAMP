@@ -2057,8 +2057,9 @@
         if(it.gt.1) npoint(it)=npoint(it-1)+nparmc(it-1)
   409   nparmj=nparmj+nparmc(it)+nparmf(it)
       nparme=nparm-nparml-nparmj-nparmcsf-nparms-nparmg-nparmot
-      write(6,'(''No of linear coefs, exponents, Jastrow, det, scale parms varied='',9i5)') &
-     &nparml, nparme, nparmj, nparmcsf, nparms
+      write(6,'(''No of linear coefs, exponents, Jastrow, csf, scale, Jastrow g, orbital parms varied='',9i5)') &
+     &nparml, nparme, nparmj, nparmcsf, nparms, nparmg, nparmot
+      call systemflush(6)
       if(nparme.lt.0) stop 'nparme < 0'
       if(nparme.gt.nbasis) stop 'nparme > nbasis'
       if(nparme.gt.0 .and. numr.gt.0) stop 'nparme > 0 and numr > 0'
@@ -2232,14 +2233,14 @@
         call alloc ('orb_constraints', orb_constraints, notype, nbasis-1, 2) !GO
         do it=1,notype  ! read in constraints
           if(norb_constraints(it).lt.0 .or. norb_constraints(it).gt.(nbasis-1)) then !GO
-            write(6, '(''There must be between 0 and (nbasis-1) constraints'')')
+            write(6, '(''There must be between 0 and (nbasis-1) constraints'')') ; call systemflush(6)
             stop 'Invalid number of constraints.'
           endif
           if(norb_constraints(it).eq.0 .and. nparmo(it).lt.0) then
-            write(6, '(''nparmo<0, but no constraints found'')')
+            write(6, '(''nparmo<0, but no constraints found'')') ; call systemflush(6)
             stop 'Invalid number of constraints.'
           elseif(norb_constraints(it).ne.0 .and. nparmo(it).ge.0) then
-            write(6, '(''Cannot specify constraints if nparmo>=0'')')
+            write(6, '(''Cannot specify constraints if nparmo>=0'')') ; call systemflush(6)
             stop 'Invalid number of constraints.'
           endif
           read(5,*) ((orb_constraints(it,i,j),j=1,2),i=1,norb_constraints(it))
