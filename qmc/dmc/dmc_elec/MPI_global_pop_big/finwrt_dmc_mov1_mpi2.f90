@@ -45,7 +45,7 @@
       dimension zzpairtot(-NAX:NAX,-NAX:NAX),zzdenijtot(-NAX:NAX,0:(nelec-1))
       dimension zzcorrtot(0:NAX), zzcorrijtot(0:(nelec-1))
       dimension zzave(nzzvars), zzerr(nzzvars)
-      real*8 :: irphaset(NIRBINS_bff), psit(20)
+      real*8 :: irphaset(NIRBINS_bff), psit(nelec)
 
       character*80 fmt
 !JT      character*80 title,fmt
@@ -192,8 +192,8 @@
             do 119 i2=-NAX,NAX
   119         bffden2d_d(i1,i2)=den2dt(i1,i2)
 
-          call mpi_reduce(psi_M_acc_bff,psit,20,mpi_double_precision,mpi_sum,0,MPI_COMM_WORLD,ierr)
-          do 120 i1=1,20
+          call mpi_reduce(psi_M_acc_bff,psit,nrings_bff,mpi_double_precision,mpi_sum,0,MPI_COMM_WORLD,ierr)
+          do 120 i1=1,nrings_bff
   120       psi_M_acc_bff(i1)=psit(i1)
 
           call mpi_reduce(irphase_bff,irphaset,NIRBINS_bff,mpi_double_precision,mpi_sum,0,MPI_COMM_WORLD,ierr)
