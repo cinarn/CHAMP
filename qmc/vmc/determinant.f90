@@ -56,6 +56,7 @@
       common /s2l2_switches/ icalc_L2, icalc_S2
 
       dimension x(3,*),rvec_en(3,nelec,*),r_en(nelec,*),ddet_det(3,*),div_vd(nelec)
+      logical small_determ
 
 ! initialize the derivative arrays to zero
       do 10 i=1,nelec
@@ -257,32 +258,44 @@
             ekinen(i)=ekinen(i)+d2edeti_deti(i,iwdet)*term
   117       d2lndet=d2lndet+d2edeti_deti(i,iwdet)*term
 
-! Inverse of full sum of determinants
-      detinv=one/determ
-
-! If detinv is infinite set it to largest number
-!     if(isinf(detinv)) then ! should also work
-      if(0.1*detinv==detinv) then
-        write(6,'(''determinant: determ, detinv1='',9es12.4)') determ, detinv
-        determ=tiny(determ)
-        detinv=1/determ
-        determ=0
-        write(6,'(''determinant: determ, detinv2='',9es12.4)') determ, detinv
+! A nonzero subnormal determinant need not have a representable reciprocal.
+! Divide its derivative numerators directly, preserving its value and sign.
+      small_determ=determ.ne.0.d0.and.abs(determ).lt.tiny(determ)
+      if(small_determ) then
+        detinv=0.d0
+      elseif(determ.eq.0.d0) then
+! Retain the zero-state fallback without first forming an infinite reciprocal.
+        detinv=one/tiny(determ)
+      else
+        detinv=one/determ
       endif
 
 ! multiply through to set up logarithmic first and second derivatives
-      d2lndet=d2lndet*detinv
+      if(small_determ) then
+        d2lndet=d2lndet/determ
+      else
+        d2lndet=d2lndet*detinv
+      endif
       do 120 i=1,nelec
-        div_vd(i)=ekinen(i)*detinv
-        ekinen(i)=-half*ekinen(i)*detinv
+        if(small_determ) then
+          div_vd(i)=ekinen(i)/determ
+          ekinen(i)=-half*(ekinen(i)/determ)
+        else
+          div_vd(i)=ekinen(i)*detinv
+          ekinen(i)=-half*ekinen(i)*detinv
+        endif
         do 120 k=1,ndim
-          ddet_det(k,i)=ddet_det(k,i)*detinv
+          if(small_determ) then
+            ddet_det(k,i)=ddet_det(k,i)/determ
+          else
+            ddet_det(k,i)=ddet_det(k,i)*detinv
+          endif
           div_vd(i)=div_vd(i)-ddet_det(k,i)**2
   120     d2lndet=d2lndet-ddet_det(k,i)**2
 
 ! EXACT L_Z^2 AND S^2 OBSERVABLE ESTIMATORS
-      if (icalc_L2 .eq. 1) call calc_l2_exact(x, detinv, el2_det)
-      if (icalc_S2 .eq. 1) call calc_s2_exact(detinv, s2_det)
+      if (icalc_L2 .eq. 1) call calc_l2_exact(x, detinv, determ, el2_det)
+      if (icalc_S2 .eq. 1) call calc_s2_exact(detinv, determ, s2_det)
 
 ! Derivatives wrt to csf_coefs for optimizing them
 ! Note that the arrays that are needed for vmc and dmc are over ndet but
@@ -300,7 +313,11 @@
   130         ddeti_det(k,i,iparm)=0
           do 150 idet_in_csf=1,ndet_in_csf(icsf)
             idet=iwdet_in_csf(idet_in_csf,icsf)
-            if(ndn.ge.1) then
+            if(small_determ) then
+              term=detu(iwdetup(idet))*cdet_in_csf(idet_in_csf,icsf)
+              if(ndn.ge.1) term=term*detd(iwdetdn(idet))
+              term=term/determ
+            elseif(ndn.ge.1) then
               term=detu(iwdetup(idet))*detd(iwdetdn(idet))*cdet_in_csf(idet_in_csf,icsf)*detinv
              else
               term=detu(iwdetup(idet))*cdet_in_csf(idet_in_csf,icsf)*detinv
@@ -341,7 +358,7 @@
 
 
         if(nparmot.gt.0) then
-          call deriv_det_orb(orb,dorb,ddorb,detinv)
+          call deriv_det_orb(orb,dorb,ddorb,detinv,determ)
         endif
 
 
@@ -353,7 +370,7 @@
       
 !--------------------------------------------------------------------------------------
 
-subroutine deriv_det_orb(orb,dorb,ddorb,detinv)
+subroutine deriv_det_orb(orb,dorb,ddorb,detinv,det_total_value)
   ! Exact derivatives using the independent-parameter map and spin trace contractions.
   ! Real, localized Gaussian basis-parameter derivatives, ibasis=4,5,8.
   ! Compact basis derivatives are evaluated by deriv_orbitals.
@@ -379,17 +396,18 @@ subroutine deriv_det_orb(orb,dorb,ddorb,detinv)
   implicit none
 
   real(dp), intent(in) :: orb(nelec,norb), dorb(3,nelec,norb), ddorb(nelec,norb)
-  real(dp), intent(in) :: detinv
+  real(dp), intent(in) :: detinv, det_total_value
 
   integer :: ip, p, q, np, ntot
   integer :: icsf, idc, idet, iu, idn, ie, k, jcsf, nterm, ga, gb
   real(dp) :: base, weight, value, lap_up, lap_dn
-  logical :: newton
+  logical :: newton, small_determ
 
   if (nparmot == 0) return
   np = nparmot
   ntot = nparmcsf + np
   newton = mod(iopt,10) == 2
+  small_determ = det_total_value /= 0.0_dp .and. abs(det_total_value) < tiny(det_total_value)
   deti_det(nparmcsf+1:ntot) = 0.0_dp
   ddeti_det(:,:,nparmcsf+1:ntot) = 0.0_dp
   d2deti_det(nparmcsf+1:ntot) = 0.0_dp
@@ -406,11 +424,13 @@ subroutine deriv_det_orb(orb,dorb,ddorb,detinv)
     do idc = 1, ndet_in_csf(icsf)
       idet = iwdet_in_csf(idc,icsf)
       iu = iwdetup(idet)
-      base = detu(iu)*cdet_in_csf(idc,icsf)*detinv
+      base = detu(iu)*cdet_in_csf(idc,icsf)
+      if (.not. small_determ) base = base*detinv
       if (ndn > 0) then
         idn = iwdetdn(idet)
         base = base*detd(idn)
       endif
+      if (small_determ) base = base/det_total_value
       weight = csf_coef(icsf,iwf)*base
       orb_wup(iu) = orb_wup(iu) + weight
       if (ndn > 0) orb_wdn(idn) = orb_wdn(idn) + weight
@@ -426,13 +446,15 @@ subroutine deriv_det_orb(orb,dorb,ddorb,detinv)
     do idc = 1, ndet_in_csf(icsf)
       idet = iwdet_in_csf(idc,icsf)
       iu = iwdetup(idet)
-      base = detu(iu)*cdet_in_csf(idc,icsf)*detinv
+      base = detu(iu)*cdet_in_csf(idc,icsf)
+      if (.not. small_determ) base = base*detinv
       orb_osum = orb_oup(:,iu)
       if (ndn > 0) then
         idn = iwdetdn(idet)
         base = base*detd(idn)
         orb_osum = orb_osum + orb_odn(:,idn)
       endif
+      if (small_determ) base = base/det_total_value
       weight = csf_coef(icsf,iwf)*base
       if (ndn > 0 .and. weight /= 0.0_dp) then
         ! Cross terms need only parameters with a nonzero spin first derivative.
@@ -675,7 +697,7 @@ end subroutine deriv_det_orb
       
 !--------------------------------------------------------------------------------------
 
-      subroutine calc_l2_exact(x, detinv, el2_det_out)
+      subroutine calc_l2_exact(x, detinv, det_total_value, el2_det_out)
 ! Evaluates exact analytical L_z^2 direct local estimator
 ! GO, Oct 2026
       use all_tools_mod
@@ -702,7 +724,7 @@ end subroutine deriv_det_orb
       implicit real*8(a-h,o-z)
 
       dimension x(3,*)
-      real*8 :: detinv, el2_det_out
+      real*8 :: detinv, det_total_value, el2_det_out
       
       real*8, allocatable, save :: lz_up(:), lz2_up(:), lz_dn(:), lz2_dn(:)
       real*8, allocatable, save :: T_x_u(:,:), T_y_u(:,:), M_u(:,:)
@@ -839,7 +861,11 @@ end subroutine deriv_det_orb
             term_csf = detu(iwdetup(idet)) * csf_coef(icsf,iwf) * cdet_in_csf(idet_in_csf,icsf)
             term_l2 = lz2_up(iwdetup(idet))
           endif
-          el2_det_out = el2_det_out + term_l2 * term_csf * detinv
+          if(det_total_value.ne.0.d0.and.abs(det_total_value).lt.tiny(det_total_value)) then
+            el2_det_out = el2_det_out + (term_l2 * term_csf)/det_total_value
+          else
+            el2_det_out = el2_det_out + term_l2 * term_csf * detinv
+          endif
         enddo
       enddo
 
@@ -848,7 +874,7 @@ end subroutine deriv_det_orb
 
 !--------------------------------------------------------------------------------------
 
-      subroutine calc_s2_exact(detinv, s2_det_out)
+      subroutine calc_s2_exact(detinv, det_total_value, s2_det_out)
 ! Calculates S^2 using Sherman-Morrison rank-1 swap updates
 ! GO, Oct 2026
       use all_tools_mod
@@ -874,7 +900,7 @@ end subroutine deriv_det_orb
       use kinet_mod
       implicit real*8(a-h,o-z)
 
-      real*8 :: detinv, s2_det_out
+      real*8 :: detinv, det_total_value, s2_det_out
       real*8 :: ratio_sum, rat_up, rat_dn, term
 
       s2_det_out = 0.d0
@@ -903,7 +929,11 @@ end subroutine deriv_det_orb
                 ratio_sum = ratio_sum + term * rat_up * rat_dn
               enddo
             enddo
-            s2_det_out = s2_det_out + ratio_sum * detinv
+            if(det_total_value.ne.0.d0.and.abs(det_total_value).lt.tiny(det_total_value)) then
+              s2_det_out = s2_det_out + ratio_sum / det_total_value
+            else
+              s2_det_out = s2_det_out + ratio_sum * detinv
+            endif
           enddo
         enddo
       endif

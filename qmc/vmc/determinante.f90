@@ -184,11 +184,18 @@
           endif
   115     determ=determ+term
 
-      detinv=one/determ
-      do 120 i=1,nelec
-        ddet_det(1,i)=ddet_det(1,i)*detinv
-        ddet_det(2,i)=ddet_det(2,i)*detinv
-  120   ddet_det(3,i)=ddet_det(3,i)*detinv
+      if(determ.eq.0.d0) then
+! The logarithmic drift is undefined at a node; this trial has zero weight.
+        ddet_det(1:3,1:nelec)=0.d0
+      elseif(abs(determ).lt.tiny(determ)) then
+        ddet_det(1:3,1:nelec)=ddet_det(1:3,1:nelec)/determ
+      else
+        detinv=one/determ
+        do 120 i=1,nelec
+          ddet_det(1,i)=ddet_det(1,i)*detinv
+          ddet_det(2,i)=ddet_det(2,i)*detinv
+  120     ddet_det(3,i)=ddet_det(3,i)*detinv
+      endif
 
       return
       end

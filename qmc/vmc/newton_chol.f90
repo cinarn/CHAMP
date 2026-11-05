@@ -233,7 +233,8 @@
       if(nparm.eq.0) return
 
       if(mod(iopt,10).eq.1) then
-        call linear_method(iadd_diag,ipr_eigs)
+        call linear_method(iadd_diag,ipr_eigs,iflag)
+        if(iflag.ne.0) return
        elseif(mod(iopt,10).eq.2) then
         call newton_chol(iadd_diag,ipr_eigs,iflag)
         if(iflag.ne.0) return
@@ -535,7 +536,7 @@
 !  99 stop 'ierr.ne.0 in chlsky'
       end
 !-----------------------------------------------------------------------
-      subroutine linear_method(iadd_diag,ipr_eigs)
+      subroutine linear_method(iadd_diag,ipr_eigs,iflag)
       use all_tools_mod
       use optim_mod
       use const_mod
@@ -546,12 +547,17 @@
       use linear_mod
       use linear_orig_mod
       use linear_sav_mod
+      use, intrinsic :: ieee_arithmetic
       implicit real*8(a-h,o-z)
       parameter(eps=1.d-9)
 
       integer MWORK
       double precision, allocatable :: work(:)
       dimension eigv(nparm+1),eigvi(nparm+1),eig_denom(nparm+1)
+      logical usable_root(nparm+1)
+
+      iflag=1
+      dnorm2=0.d0
 
 
 ! for high printout, set idebug=1
@@ -594,8 +600,7 @@
           endif
     6 continue
 
-!c    if(ipr_eigs.ge.1 .and. ipr_opt.ge.1) then
-!     if(ipr_opt.ge.1) then
+      if(ipr_opt.ge.1) then
        do  i=1,nparmp1
          write(6,'(''ovlp='',20g12.4)') (ovlp(i,j),j=1,i)
        enddo
@@ -605,7 +610,7 @@
          write(6,'(''ham='',20g12.4)') (ham(i,j),j=1,nparmp1)
        enddo
        write(6,*)
-!     endif
+      endif
 
 
       MWORK=nparmp1*nparmp1+1024
@@ -632,10 +637,23 @@
 
       write(6,'(''eigenvalue_denominators in dggev='',20d10.2)') (eig_denom(i),i=1,nparmp1)
       do 15 i=1,nparmp1
+        usable_root(i)=.false.
+! DGGEV returns alpha/beta. A singular overlap can give beta=0 without
+! indicating a failure of the QZ algorithm; that root cannot define a step.
+        if(.not.ieee_is_finite(eigv(i)).or..not.ieee_is_finite(eigvi(i)).or. &
+     &     .not.ieee_is_finite(eig_denom(i))) goto 14
+        if(eig_denom(i).eq.0.d0) goto 14
+        if(abs(eig_denom(i)).lt.1.d0) then
+          if(max(abs(eigv(i)),abs(eigvi(i))).gt.huge(1.d0)*abs(eig_denom(i))) goto 14
+        endif
         eigv(i)=eigv(i)/eig_denom(i)
         eigvi(i)=eigvi(i)/eig_denom(i)
-   15   write(6,'(''eigenvalue '',f16.6,'' + i* '',f10.6)') &
+        usable_root(i)=eigvi(i).eq.0.d0
+        write(6,'(''eigenvalue '',f16.6,'' + i* '',f10.6)') &
      &  eigv(i),eigvi(i)
+        goto 15
+   14   write(6,'(a,i0,a)') 'Generalized eigenvalue ',i,' is infinite or indeterminate; excluded.'
+   15 continue
       write(6,*)
 
 ! The foll. is confusing
@@ -653,8 +671,15 @@
 ! If 2 eigenvec have first coefs that are nearly equal in magnitude then
 ! choose the one for which the remaining coefs. are smaller in magnitude.
       coef_max=0
-      i_coef_max=1
+      i_coef_max=0
       do 19 i=1,nparmp1
+        if(.not.usable_root(i)) goto 19
+        if(.not.all(ieee_is_finite(coef(:,i)))) goto 19
+        if(i_coef_max.eq.0) then
+          coef_max=abs(coef(1,i))
+          i_coef_max=i
+          goto 19
+        endif
         if(abs(coef(1,i))-coef_max.gt.-eps) then
           if(abs(coef(1,i))-coef_max.gt.eps) then
             coef_max=abs(coef(1,i))
@@ -672,6 +697,10 @@
           endif
         endif
    19 continue
+      if(i_coef_max.eq.0) then
+        write(6,'(a)') 'No finite real Linear Method root; increasing damping.'
+        goto 99
+      endif
       write(6,'(''The eigenvector with largest coefficient ratio is '',i4,'' eigenvalue='',f12.5,'' coef(1)='',f8.5)') &
      &i_coef_max,eigv(i_coef_max),coef(1,i_coef_max)
 
@@ -681,6 +710,7 @@
       i_emin=0
       emin=9.d99
       do 20 i=1,nparmp1
+        if(.not.usable_root(i)) goto 20
         if(eigv(i).lt.emin .and. abs(eigv(i)-etrial).lt.10.d0) then
           if(eigv(i).lt.eigv(i_coef_max)-eps) then
             emin=eigv(i)
@@ -706,8 +736,10 @@
 !     endif
 
 !     do 22 i=1,min(nparmp1,5)
-      do 22 i=1,nparmp1
-   22   write(6,'(''i,coef'',i2,500f7.4)') i,(coef(j,i),j=1,nparmp1)
+      if(ipr_opt.ge.1) then
+        do 22 i=1,nparmp1
+   22     write(6,'(''i,coef'',i0,1x,*(es14.6,1x))') i,(coef(j,i),j=1,nparmp1)
+      endif
 
       if(mod(iopt/1000,10).eq.1) then
         i0=i_emin
@@ -723,22 +755,29 @@
    23     coef(i,i0)=coef(i,i0)/renorm_ovlp(i)
 
 ! calculate normalization
+      if(.not.all(ieee_is_finite(coef(:,i0)))) goto 99
       sum=coef(1,i0)
       if(mod(iopt/10000,10).eq.0) then
+        if(coef(1,i0).eq.0.d0) goto 99
         dnorm1=1.d0/coef(1,i0)
        elseif(mod(iopt/10000,10).eq.1) then
         do 24 i=2,nparmp1
           write(6,'(''ovlp_orig(1,i),coef(i,i0),ovlp_orig(1,i)*coef(i,i0)'',9f9.5)') &
      &    ovlp_orig(1,i),coef(i,i0),ovlp_orig(1,i)*coef(i,i0)
    24     sum=sum-ovlp_orig(1,i)*coef(i,i0)
+        if(sum.eq.0.d0) goto 99
         dnorm1=1.d0/sum
        elseif(mod(iopt/10000,10).eq.2 .or. mod(iopt/10000,10).eq.3) then
         do 26 i=1,nparmcsf
           write(6,'(''ovlp_orig(1,i+1),coef(i+1,i0),ovlp_orig(1,i+1)*coef(i+1,i0)'',9f9.5)') &
      &    ovlp_orig(1,i+1),coef(i+1,i0),ovlp_orig(1,i+1)*coef(i+1,i0)
    26     sum=sum-ovlp_orig(1,i+1)*coef(i+1,i0)
+        if(sum.eq.0.d0) goto 99
         dnorm1=1.d0/sum
-        if(mod(iopt/10000,10).eq.3) dnorm2=1.d0/coef(1,i0)
+        if(mod(iopt/10000,10).eq.3) then
+          if(coef(1,i0).eq.0.d0) goto 99
+          dnorm2=1.d0/coef(1,i0)
+        endif
        elseif(mod(iopt/10000,10).eq.4 .or. mod(iopt/10000,10).eq.5) then
         do 28 i=nparmcsf+2,nparmp1
           term1=coef(1,i0)*ovlp_orig(1,i)
@@ -759,9 +798,12 @@
    27       term2=term2+coef(j,i0)*ovlp_orig(1,j)
           write(6,'(''ovlp_orig(1,i),coef(i,i0),ovlp_orig(1,i)*coef(i,i0),term1,term2'',9f9.5)') &
      &    ovlp_orig(1,i),coef(i,i0),ovlp_orig(1,i)*coef(i,i0),term1,term2
+          if(term2.eq.0.d0) goto 99
    28     sum=sum+(term1/term2)*coef(i,i0)
+        if(sum.eq.0.d0) goto 99
         dnorm1=1.d0/sum
       endif
+      if(.not.ieee_is_finite(dnorm1).or..not.ieee_is_finite(dnorm2)) goto 99
       write(6,'(''eigv  '',f10.3)') eigv(i0)
       write(6,'(''coef0,dnorm1,dnorm2 '',9f16.11)') coef(1,i0),dnorm1,dnorm2
 !     write(6,'(''dparm '',100es11.3)') (coef(i,i0)*dnorm1,i=2,nparmp1)
@@ -783,6 +825,8 @@
 !  50     dparm_norm=dparm_norm+(coef(iparm+1,i0)*dnorm2)**2
       endif
 
+      if(.not.all(ieee_is_finite(dparm))) goto 99
+      iflag=0
       dparm_norm=0
       do 60 iparm=1,nparm
    60   dparm_norm=dparm_norm+dparm(iparm)**2
@@ -806,6 +850,14 @@
       dnorm_move=sqrt(dnorm_move)
       write(6,'(''Norm of the move is'',d12.4)') dnorm_move
 
+      return
+   99 continue
+      write(6,'(a)') 'Unsupported Linear Method root or normalization; increasing damping.'
+      if(allocated(dparm)) dparm=0.d0
+      do i=1,nparmp1
+        ham(:,i)=ham_sav(:,i)
+        ovlp(:,i)=ovlp_sav(:,i)
+      enddo
       return
       end
 !-----------------------------------------------------------------------

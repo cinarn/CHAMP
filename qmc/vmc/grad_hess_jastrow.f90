@@ -1,3 +1,24 @@
+      subroutine grad_hess_jas_sum_vmc(p,q,enew,eold)
+! VMC has no derivatives of the DMC weights. Pass an actual zero array;
+! a scalar zero cannot stand in for wi_w(nparm) when nparm is greater than 1.
+      use contrl_opt_mod, only: nparm
+      use contrl_opt2_mod, only: igradhess
+      implicit none
+      real*8 p,q,enew,eold
+      real*8, allocatable, save :: zero_weight_derivatives(:)
+
+      if(igradhess.eq.0) return
+      if(allocated(zero_weight_derivatives)) then
+        if(size(zero_weight_derivatives).ne.nparm) deallocate(zero_weight_derivatives)
+      endif
+      if(.not.allocated(zero_weight_derivatives)) then
+        allocate(zero_weight_derivatives(nparm))
+        zero_weight_derivatives=0.d0
+      endif
+      call grad_hess_jas_sum(p,q,enew,eold,1.d0,zero_weight_derivatives)
+      return
+      end
+!-----------------------------------------------------------------------
       subroutine grad_hess_jas_sum(p,q,enew,eold,wt,wi_w)
 ! Note that if it is called from a 1-electron move routine then p=1 and only new values are relevant.
 ! Hence it is not necessary to call grad_hess_jas_save.
@@ -514,16 +535,11 @@
            if(j.gt.nparmcsf+nparmot) then
              bot_j=dj_de(i,j)+dj_de(j,i)-(dj(i)*de(j)+dj(j)*de(i))/passes
              top_j=bot_j+2*(2*(dj_dj_e(i,j)-eave*dj_dj(i,j))-grad(i)*dj(j)-grad(j)*dj(i))
-             if(ipr_opt.ge.-2) then
-               if(nparms.eq.0) then
-                 write(6,'(''i,j,top_j,bot_j,ratio='',i2,i3,1p2d11.3,0pf6.2)') i,j,top_j,bot_j,top_j/bot_j
-               else
-                 write(6,'(''i,j,top_j,bot_j='',2i5,2es11.3)') i,j,top_j,bot_j
-               endif
-             endif
+             if(ipr_opt.ge.-2) &
+     &         write(6,'(''i,j,top_j,bot_j='',2i5,2es11.3)') i,j,top_j,bot_j
              botsum_j=botsum_j+bot_j
              topsum_j=topsum_j+top_j
-             if(nparms.eq.1) botabs_j=botabs_j+abs(bot_j)
+             botabs_j=botabs_j+abs(bot_j)
              check=(2*(2*(dj_dj_e(i,j)-eave*dj_dj(i,j)) &
      &             -grad(i)*dj(j)-grad(j)*dj(i)) &
      &             +dj_de(i,j)+dj_de(j,i)-(dj(i)*de(j)+dj(j)*de(i))/passes)
@@ -537,23 +553,24 @@
            endif
    25 continue
       ratio_j=1.d0
-      if(nparms.eq.1) then
+      use_uf_j=mod(iopt/100,10).eq.1
+      if(nparmj+nparms.gt.0.and..not.use_uf_j) then
 ! Fall back to the unrescaled Hessian if the rescaling ratio is undefined
-! or loses precision through cancellation. iopt=102 never needs this ratio.
-        use_uf_j=mod(iopt/100,10).eq.1
-        if(.not.use_uf_j) then
-          use_uf_j=.true.
-          if(ieee_is_finite(topsum_j).and.ieee_is_finite(botsum_j).and.ieee_is_finite(botabs_j)) then
-            if(abs(botsum_j).gt.sqrt(epsilon(1.d0))*max(botabs_j,abs(topsum_j))) then
-              ratio_j=topsum_j/botsum_j
-              use_uf_j=.not.ieee_is_finite(ratio_j)
-            endif
+! or nonpositive. Apply the same policy with scalek fixed or active.
+! UF uses its full expression below, not ratio_j=1 in the rescaled formula.
+        use_uf_j=.true.
+        if(ieee_is_finite(topsum_j).and.ieee_is_finite(botsum_j).and.ieee_is_finite(botabs_j)) then
+          if(abs(botsum_j).gt.sqrt(epsilon(1.d0))*max(botabs_j,abs(topsum_j))) then
+            ratio_j=topsum_j/botsum_j
+            use_uf_j=.not.ieee_is_finite(ratio_j)
+            if(.not.use_uf_j) use_uf_j=ratio_j.le.0.d0
           endif
-          if(use_uf_j.and.ipr_opt.ge.-4) &
-     &      write(6,'(a)') 'Ill-conditioned Jastrow Hessian rescaling; using the unrescaled Hessian.'
         endif
-      else
-        if(nparmj.gt.0) ratio_j=topsum_j/botsum_j
+        if(use_uf_j) then
+          ratio_j=1.d0
+          if(ipr_opt.ge.-4) write(6,'(a)') &
+     &      'Unreliable Jastrow Hessian rescaling; using the unrescaled Hessian.'
+        endif
       endif
 !     ratio_csf_j=topsum_csf_j/botsum_csf_j
       if(ipr_opt.ge.-4) write(6,'(''ratio_j,grad_norm,grad_var_norm='',3es11.3)') ratio_j,grad_norm,grad_var_norm
@@ -581,7 +598,7 @@
 ! In hess_pieces write the expression for hess in our PRL but then evaluate hess for writing in
 ! grad_hess
       write(20,'(5i4,'' nparm,nparmcsf,nparmot,nparmj,nparms='')') nparm,nparmcsf,nparmot,nparmj,nparms
-      write(fmt,'(''('',i3,''g14.6,a)'')') nparm
+      write(fmt,'(''('',i0,''g14.6,a)'')') nparm
       write(20,fmt) (grad(i),i=1,nparm), ' (grad(i),i=1,nparm)'
       write(20,fmt) (grad_var(i),i=1,nparm), ' (grad_var(i),i=1,nparm)'
 !     write(20,'(''grad    ='',50f8.4)') (grad(i),i=1,nparm)

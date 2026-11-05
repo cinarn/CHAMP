@@ -86,7 +86,11 @@
 !         call hpsi(xnew,psidn,psijn,vnew,div_vn,d2,pen,enew(1),denergy,1)
 !         write(6,'(''calling hpsie from metrop_mov1'')')
           call hpsie(iel,xnew,psidn,psijn,vnew)
-          psi2n(1)=2*(dlog(dabs(psidn))+psijn)
+          if(psidn.eq.0.d0) then
+            psi2n(1)=-huge(psi2n(1))
+          else
+            psi2n(1)=2*(dlog(dabs(psidn))+psijn)
+          endif
 
 ! save electrostatic potential at new configuration
 !   distances.f is not called from from hpsie, so we add a call to distances here,
@@ -325,7 +329,7 @@
 !        call efpsav
 !      endif
 
-      call grad_hess_jas_sum(1.d0,0.d0,eold(1),eold(1),1.d0,0.d0)
+      call grad_hess_jas_sum_vmc(1.d0,0.d0,eold(1),eold(1))
 
       call acues1
 

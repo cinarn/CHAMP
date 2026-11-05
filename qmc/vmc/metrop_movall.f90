@@ -144,7 +144,7 @@
 !        call sample_efp(1,xnew,enew(1),p)
 !      endif
 
-      call grad_hess_jas_sum(p,q,enew(1),eold(1),1.d0,0.d0)
+      call grad_hess_jas_sum_vmc(p,q,enew(1),eold(1))
 
       call acues1
 
