@@ -286,7 +286,8 @@
               call opt_wf_increase_diag(add_diag(1),10.d0**iflag1)
               write(6,'(''change in params. too large or a(2) or b(2) < -scalek, add_diag(1) increased to'',1pd12.4)') add_diag(1)
               iadd_diag_loop5=iadd_diag_loop5+1
-              if(iadd_diag_loop5.lt.9) then
+! Small fixed input shifts must reach the same finite retry range as other runs.
+              if(iadd_diag_loop5.lt.9.or.add_diag(1).lt.1.d10) then
                 goto 409
                else
                 stop 'iadd_diag_loop5 too large'

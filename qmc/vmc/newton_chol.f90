@@ -757,9 +757,16 @@
 ! calculate normalization
       if(.not.all(ieee_is_finite(coef(:,i0)))) goto 99
       sum=coef(1,i0)
+! For linear CSFs undo centering, including modes with no nonlinear loop.
+      if(nparmcsf.eq.nparm.and.mod(iopt/100,10).eq.1.and. &
+     &  (mod(iopt/10000,10).eq.0.or.mod(iopt/10000,10).ge.4)) then
+        do i=1,nparmcsf
+          sum=sum-ovlp_orig(1,i+1)*coef(i+1,i0)
+        enddo
+      endif
       if(mod(iopt/10000,10).eq.0) then
-        if(coef(1,i0).eq.0.d0) goto 99
-        dnorm1=1.d0/coef(1,i0)
+        if(sum.eq.0.d0) goto 99
+        dnorm1=1.d0/sum
        elseif(mod(iopt/10000,10).eq.1) then
         do 24 i=2,nparmp1
           write(6,'(''ovlp_orig(1,i),coef(i,i0),ovlp_orig(1,i)*coef(i,i0)'',9f9.5)') &
