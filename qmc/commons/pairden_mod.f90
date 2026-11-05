@@ -32,6 +32,10 @@ module pairden_mod
  integer, allocatable :: bff_rows(:), bff_p(:), bff_way(:)
  logical, allocatable :: bff_used(:), bff_visited(:)
  
+! Reused rotation-fit workspace; allocated once during initialize_bff.
+ integer, allocatable :: bff_angle_order(:)
+ double precision, allocatable :: bff_angle_theta(:), bff_vertex_cos(:), bff_vertex_sin(:)
+
 ! Variables for Inter-Ring Phase Correlation
  integer :: M_ir_bff ! Common harmonic of the two outermost shells.
  integer, parameter :: NIRBINS_bff = 100

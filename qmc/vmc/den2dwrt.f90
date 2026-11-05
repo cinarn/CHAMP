@@ -513,16 +513,19 @@
         write(41,'("# conf_bff: ",*(i5))') conf_bff(1:nrings_bff)
         write(41,'("# sub_conf_bff: ",*(i5))') sub_conf_bff(1:nsubrings_bff)
         write(41,'("# MAIN shell M-fold Order Parameters: ", *(G15.6))') (psi_M_acc_bff(ir) * alg_weight / passes, ir=1,nrings_bff)
+        write(41,'(a)') '# BFF body angle: rotation-only geometric polygon fit'
 
         write(42,'("# sub_id_bff: ",i5,", M_bff: ",i5)') sub_id_bff,M_bff
         write(42,'("# conf_bff: ",*(i5))') conf_bff(1:nrings_bff)
         write(42,'("# sub_conf_bff: ",*(i5))') sub_conf_bff(1:nsubrings_bff)
         write(42,'("# MAIN shell M-fold Order Parameters: ", *(G15.6))') (psi_M_acc_bff(ir) * alg_weight / passes, ir=1,nrings_bff)
+        write(42,'(a)') '# BFF body angle: rotation-only geometric polygon fit'
 
         write(43,'("# sub_id_bff: ",i5,", M_bff: ",i5)') sub_id_bff,M_bff
         write(43,'("# conf_bff: ",*(i5))') conf_bff(1:nrings_bff)
         write(43,'("# sub_conf_bff: ",*(i5))') sub_conf_bff(1:nsubrings_bff)
         write(43,'("# MAIN shell M-fold Order Parameters: ", *(G15.6))') (psi_M_acc_bff(ir) * alg_weight / passes, ir=1,nrings_bff)
+        write(43,'(a)') '# BFF body angle: rotation-only geometric polygon fit'
         
         ! 2. Recompute the Cartesian grid factor: Fourier output may have changed term.
         term = 1.d0/(passes*del1*del2)

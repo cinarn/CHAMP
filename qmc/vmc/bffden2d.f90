@@ -163,23 +163,10 @@
       call bff_subring_indices(xold,rad_o,idx_o,ref_o)
       call bff_subring_indices(xnew,rad_n,idx_n,ref_n)
 
-      C_o = 0.d0; S_o = 0.d0
-      C_n = 0.d0; S_n = 0.d0
-      
-      do k = 1, M_bff
-         j = ref_o(k)
-         theta_j = datan2(xold(2,j), xold(1,j))
-         C_o = C_o + dcos(M_bff * theta_j)
-         S_o = S_o + dsin(M_bff * theta_j)
-
-         j = ref_n(k)
-         theta_j = datan2(xnew(2,j), xnew(1,j))
-         C_n = C_n + dcos(M_bff * theta_j)
-         S_n = S_n + dsin(M_bff * theta_j)
-      end do
-
-      Theta_body_o = (1.d0 / M_bff) * datan2(S_o, C_o)
-      Theta_body_n = (1.d0 / M_bff) * datan2(S_n, C_n)
+! Retain the original main-shell |Q| accumulators and phase correlations above.
+! Only the reference angle used for the density rotation changes.
+      call bff_geometric_angle(xold,ref_o,Theta_body_o)
+      call bff_geometric_angle(xnew,ref_n,Theta_body_n)
 
       ! Transform configurations into the Body-Fixed Frame using Lab-Frame origin
       do i = 1, nelec
@@ -285,6 +272,12 @@
         nsub_bff(iring)=isub-first
       enddo
       M_bff=sub_conf_bff(sub_id_bff)
+      if(allocated(bff_angle_order)) deallocate(bff_angle_order,bff_angle_theta,bff_vertex_cos,bff_vertex_sin)
+      allocate(bff_angle_order(M_bff),bff_angle_theta(M_bff),bff_vertex_cos(M_bff),bff_vertex_sin(M_bff))
+      do s=1,M_bff
+        bff_vertex_cos(s)=dcos(2.d0*pi*dble(s-1)/dble(M_bff))
+        bff_vertex_sin(s)=dsin(2.d0*pi*dble(s-1)/dble(M_bff))
+      enddo
 
       if(allocated(bff_score)) then
         deallocate(bff_slot_cos,bff_slot_sin,bff_score,bff_unit_x,bff_unit_y,bff_mean_radius, &
@@ -510,3 +503,42 @@
         if(bff_p(j).gt.0) bff_assignment(bff_rows(bff_p(j)))=j
       enddo
       end subroutine bff_assign_partners
+
+      subroutine bff_geometric_angle(x,iref,theta_body)
+! Rotation-only fit to distinct regular-polygon vertices in circular order.
+! Cyclic relabeling changes the angle by an equivalent 2*pi/M_bff.
+      use const_mod, only: nelec, pi
+      use pairden_mod, only: M_bff, bff_angle_order, bff_angle_theta, bff_vertex_cos, bff_vertex_sin
+      implicit none
+      real*8, intent(in) :: x(3,nelec)
+      integer, intent(in) :: iref(M_bff)
+      real*8, intent(out) :: theta_body
+      real*8 :: angle, c, s, period
+      integer :: i, j, itemp, ie
+
+      do i=1,M_bff
+        ie=iref(i)
+        bff_angle_theta(i)=modulo(datan2(x(2,ie),x(1,ie)),2.d0*pi)
+        bff_angle_order(i)=i
+      enddo
+      do i=2,M_bff
+        itemp=bff_angle_order(i)
+        angle=bff_angle_theta(itemp)
+        j=i-1
+        do while(j.ge.1)
+          if(bff_angle_theta(bff_angle_order(j)).le.angle) exit
+          bff_angle_order(j+1)=bff_angle_order(j)
+          j=j-1
+        enddo
+        bff_angle_order(j+1)=itemp
+      enddo
+      c=0.d0
+      s=0.d0
+      do i=1,M_bff
+        ie=iref(bff_angle_order(i))
+        c=c+x(1,ie)*bff_vertex_cos(i)+x(2,ie)*bff_vertex_sin(i)
+        s=s+x(2,ie)*bff_vertex_cos(i)-x(1,ie)*bff_vertex_sin(i)
+      enddo
+      period=2.d0*pi/dble(M_bff)
+      theta_body=modulo(datan2(s,c)+period/2.d0,period)-period/2.d0
+      end subroutine bff_geometric_angle
