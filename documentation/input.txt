@@ -208,3 +208,16 @@ tie handling. Exact geometric/radial degeneracies need not define unique rings.
 Shell order parameters and inter-ring correlation always use MAIN conf_bff.
 The correlation uses its two outermost main shells and their lcm harmonic.
 Lab-frame origin, p/q weights, spin labels and normalization are unchanged.
+
+Collective VMC rotations (opt_list)
+----------------------------------
+irot_every=0 disables collective rotations (default). A positive value attempts
+one rotation before every irot_every single-electron sweeps. irot_order=3
+(default) chooses +120 or -120 degrees with equal probability. Other orders
+choose uniformly from the nonidentity C_n rotations about the origin.
+Acceptance uses the full |Psi(rotated)/Psi(current)|^2 Metropolis ratio;
+no potential, orbital coefficients, or density estimators are symmetrized.
+Supported: vmc_mov1 / vmc_mov1_mpi, ndim=2, ibasis=4, nloc=-8,
+iperiodic=0, nforce=1, imetro=1, and no fixed electron (ifixe<=0).
+Unsupported enabled settings, including DMC, stop with an input error.
+GLOBAL_ROTATION attempt/accept counts are local to each MPI process.

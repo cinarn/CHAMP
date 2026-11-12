@@ -60,6 +60,8 @@
 ! The transition probability is an approximately psi(new)/psi(old)
 ! and is positive definite.
 
+      call vmc_global_rotation(ipass)
+
       deltfi=two*fbias*deltai
       do 300 i=1,nelec
         if(i.ne.ifixe) then
@@ -361,3 +363,77 @@
 
       return
       end
+
+      subroutine vmc_global_rotation(ipass)
+      use all_tools_mod
+      use config_mod
+      use const_mod, only: nelec, hb
+      use eloc_mod, only: eloc
+      use psi_mod, only: psi_det
+      use delocc_mod, only: denergy
+      use kinet_mod, only: ekineo, ekinen
+      use distance_mod, only: pot_ee
+      use div_v_mod, only: div_vo
+      use jaso_mod, only: d2o
+      use contrl_mod, only: irot_order, irot_every
+      use, intrinsic :: ieee_arithmetic, only: ieee_is_finite
+      implicit none
+      integer, intent(in) :: ipass
+      integer :: turn, electron
+      integer(8), save :: attempts=0, accepted=0
+      real(8), external :: rannyu
+      real(8) :: trial(3,nelec), velocity(3,nelec), divergence(nelec)
+      real(8) :: angle, cosine, sine, trial_det, trial_jas, trial_d2
+      real(8) :: trial_pe, trial_pei, trial_energy, log_ratio
+      logical :: accept_move
+
+      if(irot_every.le.0) return
+      if(mod(ipass,irot_every).ne.0) return
+      attempts=attempts+1
+! Uniform nonidentity C_n elements give equal forward and reverse probabilities.
+      turn=1+min(irot_order-2,int(rannyu(0)*dble(irot_order-1)))
+      angle=2.d0*acos(-1.d0)*dble(turn)/dble(irot_order)
+      cosine=cos(angle)
+      sine=sin(angle)
+      trial=xold
+      do electron=1,nelec
+        trial(1,electron)=cosine*xold(1,electron)-sine*xold(2,electron)
+        trial(2,electron)=sine*xold(1,electron)+cosine*xold(2,electron)
+      enddo
+      call hpsi(trial,trial_det,trial_jas,velocity,divergence,trial_d2, &
+     &          trial_pe,trial_pei,trial_energy,denergy,1)
+      accept_move=.false.
+      if(ieee_is_finite(trial_det).and.ieee_is_finite(trial_jas).and. &
+     &   ieee_is_finite(trial_energy).and.all(ieee_is_finite(velocity(1:2,:)))) then
+        if(abs(trial_det).gt.0.d0) then
+          log_ratio=2.d0*(log(abs(trial_det))+trial_jas)-psi2o(1)
+          if(ieee_is_finite(log_ratio)) &
+     &      accept_move=log(max(rannyu(0),tiny(1.d0))).lt.min(0.d0,log_ratio)
+        endif
+      endif
+      if(accept_move) then
+        xold=trial
+        accepted=accepted+1
+      endif
+! Both outcomes require restoring full caches before the next local proposal.
+      call hpsi(xold,psido,psijo,vold,div_vo,d2o,peo,peio,eold(1),denergy,1)
+      psi2o(1)=2.d0*(log(abs(psido))+psijo)
+      pot_ee_old=pot_ee
+      pot_ee_new=pot_ee
+      ekineo=ekinen
+      xnew=xold
+      vnew=vold
+      psi2n(1)=psi2o(1)
+      eloc=eold(1)
+      psi_det=psido
+      tjfo=-d2o*0.5d0*hb
+      call object_modified_by_index(xold_index)
+      call object_modified_by_index(eold_index)
+      call object_modified_by_index(psi_det_index)
+      call object_modified_by_index(psijo_index)
+      call object_modified_by_index(denergy_index)
+      call object_modified_by_index(vold_index)
+      call object_modified_by_index(div_vo_index)
+      if(attempts.eq.1.or.mod(attempts,1000_8).eq.0) &
+     & write(6,'(a,i0,a,i0)') 'GLOBAL_ROTATION attempts=',attempts,' accepted=',accepted
+      end subroutine vmc_global_rotation
