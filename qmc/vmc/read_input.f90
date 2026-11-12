@@ -1699,9 +1699,15 @@
       if(irot_every.gt.0) then
         if(irot_order.lt.2) error stop 'irot_order must be at least 2'
         if(ndim.ne.2.or.ibasis.ne.4.or.nloc.ne.-8.or.iperiodic.ne.0.or.nforce.ne.1) &
-     &    error stop 'Rotation requires finite 2D Gaussian VMC with nloc=-8 and nforce=1'
-        if(index(mode,'vmc_mov1').ne.1.or.imetro.ne.1.or.ifixe.gt.0) &
-     &    error stop 'Rotation requires vmc_mov1, imetro=1 and no fixed electron'
+     &    error stop 'Rotation requires finite 2D Gaussian VMC/DMC with nloc=-8 and nforce=1'
+        if(ifixe.gt.0) error stop 'Rotation requires no fixed electron'
+        if(index(mode,'vmc_mov1').eq.1) then
+          if(imetro.ne.1) error stop 'VMC rotation requires imetro=1'
+        elseif(index(mode,'dmc_mov1').eq.1) then
+          if(idmc.ne.2) error stop 'DMC rotation requires idmc=2'
+        else
+          error stop 'Rotation requires vmc_mov1 or dmc_mov1'
+        endif
         write(6,'(a,i0,a,i0)') 'GLOBAL_ROTATION order=',irot_order,' every=',irot_every
       endif
 
