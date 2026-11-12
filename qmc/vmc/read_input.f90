@@ -90,7 +90,7 @@
 !     namelist /opt_list/ igradhess
       namelist /opt_list/ iring_coulomb, iantiferromagnetic, iper_gaussian_type, xmax,xfix,fmax1,fmax2,rring,ifixe,nv,idot,ifourier &
      &,iperturb,ang_perturb,amp_perturb,shrp_perturb,omg_perturb,rmin,rmax,nmeshr,nmesht,icoosys,dot_bump_height,dot_bump_radius &
-     &,nmeshk1,izigzag,zzdelyr,gndot_k,gauss_width_max,oparm3_max,oparm3_min,Cdamp_pgs,conf_bff,sub_conf_bff,sub_id_bff,icalc_L2,icalc_S2
+     &,nmeshk1,izigzag,zzdelyr,gndot_k,gauss_width_max,irot_order,irot_every,oparm3_max,oparm3_min,Cdamp_pgs,conf_bff,sub_conf_bff,sub_id_bff,icalc_L2,icalc_S2
 
       common /jel_sph1/ dn_background,rs_jel,radius_b ! RM
 
@@ -1629,6 +1629,8 @@
 
 ! Optional section:
 !   default values:
+      irot_order=3
+      irot_every=0
       ifixe=0
       xmax=5.d0
       xfix(1)=0.d0
@@ -1692,6 +1694,16 @@
       endif
       call initialize_bff
       call systemflush(6)
+
+      if(irot_order.lt.1.or.irot_every.lt.0) error stop 'Invalid rotation settings'
+      if(irot_every.gt.0) then
+        if(irot_order.lt.2) error stop 'irot_order must be at least 2'
+        if(ndim.ne.2.or.ibasis.ne.4.or.nloc.ne.-8.or.iperiodic.ne.0.or.nforce.ne.1) &
+     &    error stop 'Rotation requires finite 2D Gaussian VMC with nloc=-8 and nforce=1'
+        if(index(mode,'vmc_mov1').ne.1.or.imetro.ne.1.or.ifixe.gt.0) &
+     &    error stop 'Rotation requires vmc_mov1, imetro=1 and no fixed electron'
+        write(6,'(a,i0,a,i0)') 'GLOBAL_ROTATION order=',irot_order,' every=',irot_every
+      endif
 
       if(nloc.eq.-5) then ! ring with barrier in center
          dot_bump_radius_inv2 = 1.0d0 / (dot_bump_radius * dot_bump_radius)

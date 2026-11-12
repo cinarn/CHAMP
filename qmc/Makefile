@@ -1274,18 +1274,19 @@ $(OBJDIR)/vmc/mc_configs.o: $(OBJDIR)/all_tools_mod.o \
 	$(OBJDIR)/walkers_mod.o
 $(OBJDIR)/vmc/metrop_mov1.o: $(OBJDIR)/all_tools_mod.o \
 	$(OBJDIR)/commons/config_mod.o $(OBJDIR)/commons/const_mod.o \
-	$(OBJDIR)/commons/contrl_per_mod.o $(OBJDIR)/commons/delocc_mod.o \
-	$(OBJDIR)/commons/denupdn_mod.o $(OBJDIR)/commons/dets_mod.o \
-	$(OBJDIR)/commons/dim_mod.o $(OBJDIR)/commons/distance_mod.o \
-	$(OBJDIR)/commons/div_v_mod.o $(OBJDIR)/commons/estsig_mod.o \
-	$(OBJDIR)/commons/estsum_mod.o $(OBJDIR)/commons/forcepar_mod.o \
-	$(OBJDIR)/commons/forcewt_mod.o $(OBJDIR)/commons/fourier_mod.o \
+	$(OBJDIR)/commons/contrl_mod.o $(OBJDIR)/commons/contrl_per_mod.o \
+	$(OBJDIR)/commons/delocc_mod.o $(OBJDIR)/commons/denupdn_mod.o \
+	$(OBJDIR)/commons/dets_mod.o $(OBJDIR)/commons/dim_mod.o \
+	$(OBJDIR)/commons/distance_mod.o $(OBJDIR)/commons/div_v_mod.o \
+	$(OBJDIR)/commons/estsig_mod.o $(OBJDIR)/commons/estsum_mod.o \
+	$(OBJDIR)/commons/forcepar_mod.o $(OBJDIR)/commons/forcewt_mod.o \
+	$(OBJDIR)/commons/fourier_mod.o $(OBJDIR)/commons/jaso_mod.o \
 	$(OBJDIR)/commons/kinet_mod.o $(OBJDIR)/commons/pairden_mod.o \
 	$(OBJDIR)/commons/stepv_mod.o $(OBJDIR)/commons/zigzag_mod.o \
 	$(OBJDIR)/constants_mod.o $(OBJDIR)/control_mod.o \
 	$(OBJDIR)/determinants_mod.o $(OBJDIR)/eloc_mod.o \
 	$(OBJDIR)/montecarlo_mod.o $(OBJDIR)/opt_lin_mod.o \
-	$(OBJDIR)/opt_ptb_mod.o
+	$(OBJDIR)/opt_ptb_mod.o $(OBJDIR)/psi_mod.o
 $(OBJDIR)/vmc/metrop_movall.o: $(OBJDIR)/all_tools_mod.o \
 	$(OBJDIR)/commons/config_mod.o $(OBJDIR)/commons/const_mod.o \
 	$(OBJDIR)/commons/contrl_per_mod.o $(OBJDIR)/commons/delocc_mod.o \
