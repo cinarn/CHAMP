@@ -85,10 +85,12 @@
 ! subroutine that is called both from fit and read_input.
 !     common /fit/ nsig,ncalls,iopt,ipr_opt
 
+      common /s2l2_switches/ icalc_L2, icalc_S2
+
 !     namelist /opt_list/ igradhess
       namelist /opt_list/ iring_coulomb, iantiferromagnetic, iper_gaussian_type, xmax,xfix,fmax1,fmax2,rring,ifixe,nv,idot,ifourier &
      &,iperturb,ang_perturb,amp_perturb,shrp_perturb,omg_perturb,rmin,rmax,nmeshr,nmesht,icoosys,dot_bump_height,dot_bump_radius &
-     &,nmeshk1,izigzag,zzdelyr,gndot_k,gauss_width_max
+     &,nmeshk1,izigzag,zzdelyr,gndot_k,gauss_width_max,oparm3_max,oparm3_min,Cdamp_pgs,conf_bff,sub_conf_bff,sub_id_bff,icalc_L2,icalc_S2
 
       common /jel_sph1/ dn_background,rs_jel,radius_b ! RM
 
@@ -390,9 +392,6 @@
 ! shrp_perturb sharpness of the angular perturbation
 ! omg_perturb  omega for upside down parabola perturbation
 !
-! gauss_width_max  maximum width for 2d floating gaussian basis set (ibasis=4), optional parameter
-!                  < 0: no limit (default)
-!                  >= 0: limit with the value of gauss_width_max
 
 ! Optimization parameters:
 
@@ -665,9 +664,12 @@
         endif
         write(6,'(''Floating, periodic Gaussian basis for periodic (quasi-)1D Wigner crystals'')')
         notype=4
+      elseif(ibasis.eq.8) then
+        write(6,'(''Floating Damped Polar Gaussian basis for 2D Wigner crystals'')')
+        notype=4
       else
-        write(6,'(''read_input: ibasis must be between 1 and 7'')')
-        stop 'read_input: ibasis must be between 1 and 7'
+        write(6,'(''read_input: ibasis must be between 1 and 8'')')
+        stop 'read_input: ibasis must be between 1 and 8'
       endif
 
 !     if(index(mode,'vmc').ne.0 .and. iperiodic.gt.0) stop 'In order to do VMC calculation for periodic system run dmc or dmc.mov1 with idmc < 0'
@@ -1139,7 +1141,7 @@
       read(5,*) section
       write(6,'(/,a30,/)') section
 
-      if(ibasis.ge.3 .and. ibasis.le.7) then
+      if(ibasis.ge.3 .and. ibasis.le.8) then
         read(5,*) inum_orb
         iorb_used=0
         iorb_format='unused'
@@ -1257,7 +1259,7 @@
       elseif(ibasis.eq.3.and.numr.eq.1) then
         write(6,'(''Warning: ibasis.eq.3.and.numr.eq.1 never tested'')')
         call read_orb_loc
-      elseif((ibasis.ge.3.and.ibasis.le.7).and.numr.eq.0) then
+      elseif((ibasis.ge.3.and.ibasis.le.8).and.numr.eq.0) then
         call read_orb_dot
       elseif(ibasis.ge.4) then
         write(6,'(''read_input: This combination of ibasis='',i2,'' and numr='',i2,'' not allowed'')') ibasis,numr
@@ -1654,13 +1656,19 @@
       nmeshk1=NAK1
       icoosys=1
       iper_gaussian_type = 2
-      if (nup.eq.ndn .and. ibasis.ge.3 .and. ibasis.le.7) then
+      if (nup.eq.ndn .and. ibasis.ge.3 .and. ibasis.le.8) then
         iantiferromagnetic = 1
       else
         iantiferromagnetic = 0
       endif
       gndot_k=0.d0 !GO
-      gauss_width_max = -1 ! GO
+      gauss_width_max = -1.d0
+      oparm3_max = huge(oparm3_max) ! GO
+      oparm3_min = -huge(oparm3_min) ! GO
+      Cdamp_pgs = 1000 !GO
+      call prepare_bff_input ! Allocate electron-count-sized BFF input arrays.
+      icalc_L2 = 0
+      icalc_S2 = 0
 !     default values of dot_bump_height and dot_bump_radius are set above
 !        where w0, etc... are read in
 
@@ -1669,12 +1677,20 @@
 ! (also for 2D systems with numerical orbitals)
 !     if((ibasis.ge.3 .and. ibasis.le.7) .or. (inum_orb .ne. 0 .and. ndim .eq. 2)) then
 !  ACM: I think we should read this in for ALL 2d systems.
-      if((ibasis.ge.3 .and. ibasis.le.7) .or. (nloc.eq.-1 .and. ndim .eq. 2)) then
+      if((ibasis.ge.3 .and. ibasis.le.8) .or. (nloc.eq.-1 .and. ndim .eq. 2)) then
         read(5,*) section
         write(6,'(/,a30,/)') section
         read(5,opt_list)
         write(6,opt_list)
       endif
+
+! Check the fixed BFF setup once, before sampling or indexing the shell lists.
+      if(sub_id_bff.gt.0) then
+        if(ndim.ne.2.or.iperiodic.ne.0) stop 'BFF density requires a nonperiodic 2D system'
+        if(icoosys.ne.1) stop 'BFF density requires the Cartesian density grid (icoosys=1)'
+        if(ifixe.gt.-2) stop 'BFF density requires ifixe=-2, -3 or -4'
+      endif
+      call initialize_bff
       call systemflush(6)
 
       if(nloc.eq.-5) then ! ring with barrier in center
@@ -1712,6 +1728,11 @@
         delxi(1)=NAX/xmax
         delxi(2)=delxi(1)
       endif
+      !if (ibasis.eq.5 .or. ibasis.eq.8) then !GO
+      !  xmax = xmax * we**(-2.d0/3.d0)
+      !  xfix(1) = xfix(1) * we**(-2.d0/3.d0)
+      !  xfix(2) = xfix(2) * we**(-2.d0/3.d0)
+      !endif
       if (abs(xfix(1)) .gt. xmax) stop 'abs(xfix(1)) should be less equal than xmax' !GO
       if (abs(xfix(2)) .gt. xmax) stop 'abs(xfix(2)) should be less equal than xmax'
       if ((xfix(1) .eq. 0d0) .and.  (xfix(2) .eq. 0d0) .and. xfix(3) .ne. 360) then
@@ -1833,7 +1854,7 @@
       call systemflush(6)
 
 ! circular coordinates
-      if(ibasis.ge.3 .and. ibasis.le.7) then ! not quite the right conditions for circular coordinates, but good enough for now
+      if(ibasis.ge.3 .and. ibasis.le.8) then ! not quite the right conditions for circular coordinates, but good enough for now
         if(icoosys.lt.1 .or. icoosys.gt.2) stop 'icoosys must be 1 or 2'
         if(rmax.lt.0.d0 .or. rmin.lt.0.d0 .or. rmax.lt.rmin) stop 'we must have 0<rmin<rmax'
         if(nmeshr.gt.NAX .or. nmesht.gt.NAX .or. nmeshr.lt.1 .or. nmesht.lt.1) stop 'we must have 1<nmeshr<=NAX  and 1<nmesht<=NAX'
@@ -2104,13 +2125,14 @@
         if(it.gt.1) npoint(it)=npoint(it-1)+nparmc(it-1)
   409   nparmj=nparmj+nparmc(it)+nparmf(it)
       nparme=nparm-nparml-nparmj-nparmcsf-nparms-nparmg-nparmot
-      write(6,'(''No of linear coefs, exponents, Jastrow, det, scale parms varied='',9i5)') &
-     &nparml, nparme, nparmj, nparmcsf, nparms
+      write(6,'(''No of linear coefs, exponents, Jastrow, csf, scale, Jastrow g, orbital parms varied='',9i5)') &
+     &nparml, nparme, nparmj, nparmcsf, nparms, nparmg, nparmot
+      call systemflush(6)
       if(nparme.lt.0) stop 'nparme < 0'
       if(nparme.gt.nbasis) stop 'nparme > nbasis'
       if(nparme.gt.0 .and. numr.gt.0) stop 'nparme > 0 and numr > 0'
       if(nparme.gt.0 .and. ibasis.eq.3 .and. idot.ne.0) stop 'for quantum dots, nparme.gt.0 only possible for Fock-Darwin states'
-      if(nparme.gt.0 .and. (ibasis.eq.4 .or. ibasis.eq.5)) stop 'nparme > 0' !GO
+      if(nparme.gt.0 .and. (ibasis.eq.4 .or. ibasis.eq.5 .or. ibasis.eq.8)) stop 'nparme > 0' !GO
       if(nparml.lt.0 .or. nparmj.lt.0 .or. nparmcsf.lt.0 .or. nparms.lt.0 .or.nparmg.lt.0) stop 'nparm? must be >= 0'
       if(nparms.gt.1) stop 'nparms must be 0 or 1'
       nparmjs=nparmj+nparms !JT
@@ -2135,8 +2157,8 @@
         enddo
       enddo
       call systemflush(6)
-
-      if (ibasis.eq.5) then !GO
+      
+      if (ibasis.eq.5 .or. ibasis.eq.8) then !GO
         do iparm=1,iabs(nparmo(2))
           if (oparm(1,iwo(iparm,2),1) .eq. 0.d0) then
             write(6,*) 'Cannot optimize angular position parameter for polar gaussian located at center.'
@@ -2279,14 +2301,14 @@
         call alloc ('orb_constraints', orb_constraints, notype, nbasis-1, 2) !GO
         do it=1,notype  ! read in constraints
           if(norb_constraints(it).lt.0 .or. norb_constraints(it).gt.(nbasis-1)) then !GO
-            write(6, '(''There must be between 0 and (nbasis-1) constraints'')')
+            write(6, '(''There must be between 0 and (nbasis-1) constraints'')') ; call systemflush(6)
             stop 'Invalid number of constraints.'
           endif
           if(norb_constraints(it).eq.0 .and. nparmo(it).lt.0) then
-            write(6, '(''nparmo<0, but no constraints found'')')
+            write(6, '(''nparmo<0, but no constraints found'')') ; call systemflush(6)
             stop 'Invalid number of constraints.'
           elseif(norb_constraints(it).ne.0 .and. nparmo(it).ge.0) then
-            write(6, '(''Cannot specify constraints if nparmo>=0'')')
+            write(6, '(''Cannot specify constraints if nparmo>=0'')') ; call systemflush(6)
             stop 'Invalid number of constraints.'
           endif
           read(5,*) ((orb_constraints(it,i,j),j=1,2),i=1,norb_constraints(it))
@@ -2295,7 +2317,7 @@
             if(it.eq.1) write(6,'(''Applying constraints to floating gaussian x-positions:'')')
             if(it.eq.2) write(6,'(''Applying constraints to floating gaussian y-positions:'')')
             if(it.eq.3) write(6,'(''Applying constraints to floating gaussian widths:'')')
-          elseif(ibasis.eq.5) then
+          elseif(ibasis.eq.5 .or. ibasis.eq.8) then
             if(it.eq.1) write(6,'(''Applying constraints to floating gaussian radial positions:'')')
             if(it.eq.2) write(6,'(''Applying constraints to floating gaussian angular positions:'')')
             if(it.eq.3) write(6,'(''Applying constraints to floating gaussian radial widths:'')')
@@ -2345,7 +2367,7 @@
             if(it.eq.1) write(6,'(''New (constrained) floating gaussian x-positions:'')')
             if(it.eq.2) write(6,'(''New (constrained) floating gaussian y-positions:'')')
             if(it.eq.3) write(6,'(''New (constrained) floating gaussian widths:'')')
-          elseif(ibasis.eq.5) then
+          elseif(ibasis.eq.5 .or. ibasis.eq.8) then
             if(it.eq.1) write(6,'(''New (constrained) floating gaussian radial positions:'')')
             if(it.eq.2) write(6,'(''New (constrained) floating gaussian angular positions:'')')
             if(it.eq.3) write(6,'(''New (constrained) floating gaussian radial widths:'')')
@@ -2365,7 +2387,7 @@
           if(ibasis.eq.4 .or. ibasis.eq.6 .or. ibasis.eq.7) then
             write(6,'(''Adjusted (antiferromagnetic) floating gaussian x-positions:'')')
             it_af = 1
-          elseif(ibasis.eq.5) then
+          elseif(ibasis.eq.5 .or. ibasis.eq.8) then
             write(6,'(''Adjusted (antiferromagnetic) floating gaussian angular positions:'')')
             it_af = 2
           endif
@@ -2375,11 +2397,8 @@
         endif
       endif
 
-      ! the default value of oparm3_max is the maximum value of a real*8 variable
-      ! so that other basis sets using oparm(3,:,:) would not be affected during the optimization.
-      oparm3_max = huge(oparm3_max) ! GO
-      if (ibasis .eq. 4 .and. gauss_width_max .ge. 0d0) then
-        oparm3_max = gauss_width_max
+      if (ibasis.eq.4.and.gauss_width_max.ge.0.d0) then
+        oparm3_max = min(oparm3_max,gauss_width_max)
       endif
       write(6,'(/,''oparm3_max = '',G20.8E3,/)') oparm3_max
 
@@ -2468,7 +2487,7 @@
         stop 'nup \= ndn in sort_af_gauss_orbs'
       endif
 
-      if(ibasis.eq.5) then  ! rings, so 2nd coordinate is angular position
+      if(ibasis.eq.5 .or. ibasis.eq.8) then  ! rings, so 2nd coordinate is angular position
         it = 2
       else ! wires, so 1st coordinate is x-position (ie, position along length of wire)
         it = 1
@@ -2479,7 +2498,7 @@
 !       Adapted from routine written by Cyrus in December 1983
         M=nup+ndn
         LOGNB2=INT(DLOG(DFLOAT(M))/DLOG(2.D0)+1.D-14)
-        if(ibasis.eq.5) then
+        if(ibasis.eq.5 .or. ibasis.eq.8) then
           do ib=1,M
              oparm(it,ib,iadd_diag) = modulo(oparm(it,ib,iadd_diag), 2*pi)
           enddo

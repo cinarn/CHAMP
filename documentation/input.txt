@@ -178,3 +178,33 @@ T F analytic,cholesky
 
 nstep: number of iterations
 
+
+BFF density: main shells and cached exact angular sub-rings
+---------------------------------------------------------
+conf_bff       Main radial shell populations, ordered inside out; sum=nelec.
+sub_conf_bff   Full consecutive sub-ring population list; sum=nelec.
+               Each main shell is unsplit or contains equal-M sub-rings.
+               If omitted, defaults to conf_bff.
+sub_id_bff     Selected index in sub_conf_bff; zero disables BFF density.
+
+Example: conf_bff=2 8, sub_conf_bff=2 2 2 2 2, sub_id_bff=5.
+Counts and M_bff are derived internally. Remove old ring_id_bff and nrings_bff
+namelist entries. Lists and workspaces are sized from nelec, without a 20-entry
+limit. Active BFF requires nonperiodic 2D, icoosys=1 and ifixe=-2, -3 or -4.
+
+After main-shell radial sorting, the innermost unused electron anchors a group.
+Distinct partners maximize the sum of cosine scores to its regular M-polygon
+slots through exact rectangular assignment. Groups are ranked by mean radius.
+This optimizes partners per anchor, not the joint partition of the whole shell.
+Single-electron, single-slot and forced final-group memberships use exact fast
+paths. Unsplit shells retain the base radial ordering and angle calculation.
+
+Fixed target-slot sine/cosine values and assignment storage are prepared once.
+For every configuration, unit vectors and each anchored group's score matrix
+are recomputed; no coordinate-dependent score survives an electron move.
+Slot rows are ordered canonically by score vectors for slot-order-independent
+tie handling. Exact geometric/radial degeneracies need not define unique rings.
+
+Shell order parameters and inter-ring correlation always use MAIN conf_bff.
+The correlation uses its two outermost main shells and their lcm harmonic.
+Lab-frame origin, p/q weights, spin labels and normalization are unchanged.

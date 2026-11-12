@@ -612,7 +612,7 @@
 !        call efpsav
 !      endif
 
-      call grad_hess_jas_sum(1.d0,0.d0,eold(1),eold(1),1.d0,0.d0)
+      call grad_hess_jas_sum_vmc(1.d0,0.d0,eold(1),eold(1))
 
       call acues1
 

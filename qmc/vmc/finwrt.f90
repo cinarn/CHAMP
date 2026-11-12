@@ -35,6 +35,8 @@
 
       common /dot/ w0,we,bext,emag,emaglz,emagsz,glande,p1,p2,p3,p4,rring
       common /compferm/ emagv,nv,idot
+      common /s2l2/ el2_det, s2_det, s2o, el2o, s2sum, el2sum, s2cum, el2cum, s2cm2, el2cm2
+      common /s2l2_switches/ icalc_L2, icalc_S2
 
 
 !MS Jellium sphere
@@ -84,6 +86,9 @@
         zzfin(:)=zzcum(:)/passes
       endif
       accfin=acccum/passes
+      
+      s2fin=((dble(nup) - dble(ndn)) / 2.d0)**2 + dble(nelec)/2.d0 - s2cum/passes
+      el2fin=el2cum/passes
 
 ! In all-electron move algorithm, eerr1 differs from sigma in that eerr1 contains
 ! p*new+q*old, so eerr1 is a bit smaller than sigma.  sigma is a property
@@ -110,6 +115,8 @@
         zzerr(iz)=err(zzcum(iz),zzcm2(iz),1)
        enddo
       endif
+      s2err=err(s2cum,s2cm2,1)
+      el2err=err(el2cum,el2cm2,1)      
 !     tcsq=eerr/eerr1
       tcsq=eerr/eer1s
       call alloc ('eloc_tc', eloc_tc, nforce)
@@ -172,8 +179,13 @@
      & 'physical variable','average','rms error','rms','er*rt(pass)','sigma','','Tcor'
 
       if(nforce.eq.1) then
-        write(6,'("total E =        ",1x,f14.7,1x,"+-",1x,f11.7,1x,f9.5,1x,f11.5,1x,f9.5,1x,"+-",1x,f9.5,1x,f8.2)') & !GO
-     &  efin,eerr,eerr*rtpass,eerr1*rtpass,sigma,error_sigma,tcsq*tcsq
+        if(abs(efin)>0.1d0) then
+          write(6,'("total E =        ",1x,f14.7,1x,"+-",1x,f11.7,1x,f9.5,1x,f11.5,1x,f9.5,1x,"+-",1x,f9.5,1x,f8.2)') & !GO
+     &    efin,eerr,eerr*rtpass,eerr1*rtpass,sigma,error_sigma,tcsq*tcsq
+        else
+          write(6,'("total E =        ",1x,f14.9,1x,"+-",1x,f11.9,1x,f9.7,1x,f11.7,1x,f9.7,1x,"+-",1x,f9.7,1x,f8.2)') & !GO
+     &    efin,eerr,eerr*rtpass,eerr1*rtpass,sigma,error_sigma,tcsq*tcsq
+        endif
 
 !MS Jellium sphere
 ! eb_slf = Self-energy of the background charge
@@ -222,10 +234,17 @@
        &ifr,efin,eerr,eerr*rtpass,sigma,tcsq*tcsq
   110   write(6,'(''E_diff'',i3,'' ='',t13,f16.7,'' +-'',f11.7,f9.5)') &
      &  ifr,ffin,ferr,ferr*rtpass
-      write(6,'("potential E =    ",1x,f14.7,1x,"+-",1x,f11.7,1x,f9.5)') pefin,peerr,peerr*rtpass !GO
-      write(6,'("interaction E =  ",1x,f14.7,1x,"+-",1x,f11.7,1x,f9.5)') peifin,peierr,peierr*rtpass !GO
-      write(6,'("jf kinetic E =   ",1x,f14.7,1x,"+-",1x,f11.7,1x,f9.5)') tjffin,tjferr,tjferr*rtpass !GO
-      write(6,'("pb kinetic E =   ",1x,f14.7,1x,"+-",1x,f11.7,1x,f9.5)') tpbfin,tpberr,tpberr*rtpass !GO
+      if(abs(efin)>0.1d0) then
+        write(6,'("potential E =    ",1x,f14.7,1x,"+-",1x,f11.7,1x,f9.5)') pefin,peerr,peerr*rtpass !GO
+        write(6,'("interaction E =  ",1x,f14.7,1x,"+-",1x,f11.7,1x,f9.5)') peifin,peierr,peierr*rtpass !GO
+        write(6,'("jf kinetic E =   ",1x,f14.7,1x,"+-",1x,f11.7,1x,f9.5)') tjffin,tjferr,tjferr*rtpass !GO
+        write(6,'("pb kinetic E =   ",1x,f14.7,1x,"+-",1x,f11.7,1x,f9.5)') tpbfin,tpberr,tpberr*rtpass !GO
+      else
+        write(6,'("potential E =    ",1x,f14.9,1x,"+-",1x,f11.9,1x,f9.7)') pefin,peerr,peerr*rtpass !GO
+        write(6,'("interaction E =  ",1x,f14.9,1x,"+-",1x,f11.9,1x,f9.7)') peifin,peierr,peierr*rtpass !GO
+        write(6,'("jf kinetic E =   ",1x,f14.9,1x,"+-",1x,f11.9,1x,f9.7)') tjffin,tjferr,tjferr*rtpass !GO
+        write(6,'("pb kinetic E =   ",1x,f14.9,1x,"+-",1x,f11.9,1x,f9.7)') tpbfin,tpberr,tpberr*rtpass !GO
+      endif
 !JT         write(6,'(a,f12.7,a,f11.7)') 'Potential energy    =',pefin,' +-',peerr
 !JT         write(6,'(a,f12.7,a,f11.7)') 'Kinetic energy (JF) =',tjffin,' +-',tjferr
 !JT         write(6,'(a,f12.7,a,f11.7)') 'Kinetic energy (PB) =',tpbfin,' +-',tpberr
@@ -244,6 +263,9 @@
         write(6,'(''<r3> ='',t8,f21.4,'' +-'',f11.5,f9.2)') r3fin,r3err,r3err*rtpass
         write(6,'(''<r4> ='',t8,f21.2,'' +-'',f11.3,f9.1)') r4fin,r4err,r4err*rtpass
       endif
+      
+      if (icalc_S2 .eq. 1) write(6,'("<S^2> =          ",1x,f14.7,1x,"+-",1x,f11.7,1x,f9.5)') s2fin,s2err,s2err*rtpass
+      if (icalc_L2 .eq. 1) write(6,'("<L^2> =          ",1x,f14.7,1x,"+-",1x,f11.7,1x,f9.5)') el2fin,el2err,el2err*rtpass
 
       if(izigzag.ge.1) then
         call print_zigzag_vars(zzfin,zzerr,rtpass)

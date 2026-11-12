@@ -275,7 +275,7 @@
               do 35 irwf=1,nrbas_analytical(ictype)
    35           zex2(irwf,ictype,iadd_diag)=zex2(irwf,ictype,1)
           endif
-          if(ibasis.ge.4 .and. ibasis.le.7) then
+          if(ibasis.ge.4 .and. ibasis.le.8) then
             do 37 i=1,orb_tot_nb
               do 37 j=1,nbasis
    37           coef(j,i,iadd_diag)=coef(j,i,1)
@@ -522,6 +522,9 @@
       cent (1:ndim,1:ncent) = cent_sav (1:ndim,1:ncent)
       call object_modified ('cent')
 
+! Restore scale-dependent Jastrow caches with their parameters.
+      call set_scale_dist(-1,1)
+
       return
       end
 !-----------------------------------------------------------------------
@@ -731,6 +734,8 @@
       cent (1:ndim,1:ncent) = cent_best (1:ndim,1:ncent)
       call object_modified ('cent')
 
+      if(nparms.eq.1) call set_scale_dist(-1,1)
+
       return
 !-----------------------------------------------------------------------
       entry wf_best_write
@@ -745,15 +750,15 @@
       write(6,'(/,''Best wave function:'')')
 
       if(nparmcsf.gt.0) then
-        write(fmt,'(''(''i5,''f25.12,a)'')') ncsf
+        write(fmt,'(''(1p'',i4,''g22.14,a)'')') ncsf !GO
         write(6,fmt) (csf_coef_best(i),i=1,ncsf),' (csf_coef_best(icsf),icsf=1,ncsf)'
         write(2,fmt) (csf_coef_best(i),i=1,ncsf),' (csf_coef(icsf),icsf=1,ncsf)'
       endif
 
       if(nparmot.gt.0) then
         do it=1,notype
-          write(fmt,'(''(''i4,''f15.8,a)'')') nbasis !GO
-          if(ibasis.eq.5) then
+          write(fmt,'(''(1p'',i4,''g22.14,a)'')') nbasis !GO
+          if(ibasis.eq.5 .or. ibasis.eq.8) then
             if(it.eq.1) then
               write(6,fmt) (oparm_best(it,i),i=1,nbasis),' (floating_gauss_rad_pos_best(it,i),i=1,nbasis)'
               write(2,fmt) (oparm_best(it,i),i=1,nbasis),' (floating_gauss_rad_pos_best(it,i),i=1,nbasis)'
@@ -787,8 +792,8 @@
 
       if(nparms.gt.0) then
         write(6,'(/,''scalek parameter:'')')
-        write(6,'(f9.6,'' 0. scalek_best,a21'')') scalek_best
-        write(2,'(f9.6,'' 0. scalek_best,a21'')') scalek_best
+        write(6,'(1pg22.14,'' 0. scalek_best,a21'')') scalek_best
+        write(2,'(1pg22.14,'' 0. scalek_best,a21'')') scalek_best
       endif
 
       if(nparmj.gt.0) then

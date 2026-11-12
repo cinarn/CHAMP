@@ -9,6 +9,7 @@ module all_modules_mod
   use orb_mod
   use orbe_mod
   use dorb_mod
+  use d2orb_mod
   use slatn_mod
   use cslatn_mod
   use coefs_mod
@@ -43,6 +44,8 @@ module all_modules_mod
   use div_v_mod
   use phifun_mod
   use gs_mod
+  use deriv_phifun_mod
+  use deriv_det_mod
   use distance_mod
   use distance_sav_mod
   use periodic_mod
