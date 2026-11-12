@@ -16,24 +16,63 @@
 
       common /circularmesh/ rmin,rmax,rmean,delradi,delti,nmeshr,nmesht,icoosys
       common /dot/ w0,we,bext,emag,emaglz,emagsz,glande,p1,p2,p3,p4,rring
-! verify the normalization later...
-!      delx=1/delxi    ! doesn't work now that delxi is an array
+      
+! Local variables for BFF and Inter-Ring Phase Correlation writing
+      double precision :: range_half_bff, del_phase_bff, angle_bff, alg_weight
+      integer :: in1_bff, ir
+      
+! Normalization variables of pairden
+      double precision :: term_u_fix, term_d_fix
+      double precision :: w_up, w_dn, total_hits
+
       if(icoosys.eq.1) then
         del1=1/delxi(1)
         del2=1/delxi(2)
-        dely=del2 !used for pair density - vary transverse coord ("y")
-        delxt=del1  !used for zz pair density
+        dely=del2 
+        delxt=del1  
         nax1=NAX
         nax2=NAX
       else
         del1=1/delradi
         del2=1/delti
-        dely=del1 !used for pair density - vary transverse coord ("r")
+        dely=del1 
         delxt=del2
         nax1=nmeshr
         nax2=nmesht
       endif
-      term=1/(passes*del1*del2)
+      
+      if(index(mode,'mov1').ne.0) then
+        alg_weight = 1.d0 / dble(nelec)
+      else
+        alg_weight = 1.d0
+      endif
+      
+      if(ifixe.le.-2) then
+        ! Normalization of pair density
+        if (pair_hits_u .gt. 0.d0) then
+          term_u_fix = 1.d0 / (pair_hits_u * del1 * del2)
+        else
+          term_u_fix = 0.d0
+        endif
+        
+        if (pair_hits_d .gt. 0.d0) then
+          term_d_fix = 1.d0 / (pair_hits_d * del1 * del2)
+        else
+          term_d_fix = 0.d0
+        endif
+        
+        ! Calculate exact local spin fractions (W_up and W_dn)
+        total_hits = pair_hits_u + pair_hits_d
+        if (total_hits .gt. 0.d0) then
+          w_up = pair_hits_u / total_hits
+          w_dn = pair_hits_d / total_hits
+        else
+          w_up = 0.d0
+          w_dn = 0.d0
+        endif
+      endif
+
+      term=1.d0/(passes*del1*del2)
       
       ! Reference mesh point
       imfix1 = nint(delxi(1) * xfix(1)) !GO
@@ -171,9 +210,9 @@
               !write(41,'(''# Grid point:'',i4,''  r0 ='',G20.8E3)') in0,r0
               !write(42,'(''# Grid point:'',i4,''  r0 ='',G20.8E3)') in0,r0
               !write(43,'(''# Grid point:'',i4,''  r0 ='',G20.8E3)') in0,r0
-              write(41, '("Grid index:",i4,1x,i4,", xfix=",G20.8E3,1x,G20.8E3,1x,G20.8E3)') imfix1, imfix2, xfix(1), xfix(2), xfix(3) !GO
-              write(42, '("Grid index:",i4,1x,i4,", xfix=",G20.8E3,1x,G20.8E3,1x,G20.8E3)') imfix1, imfix2, xfix(1), xfix(2), xfix(3)
-              write(43, '("Grid index:",i4,1x,i4,", xfix=",G20.8E3,1x,G20.8E3,1x,G20.8E3)') imfix1, imfix2, xfix(1), xfix(2), xfix(3)            
+              write(41, '("Grid index:",i4,1x,i4,", xfix=",3G20.8E3,", W_up=",G15.6,", W_dn=",G15.6)') imfix1, imfix2, xfix(1), xfix(2), xfix(3), w_up, w_dn
+              write(42, '("Grid index:",i4,1x,i4,", xfix=",3G20.8E3,", W_up=",G15.6,", W_dn=",G15.6)') imfix1, imfix2, xfix(1), xfix(2), xfix(3), w_up, w_dn
+              write(43, '("Grid index:",i4,1x,i4,", xfix=",3G20.8E3,", W_up=",G15.6,", W_dn=",G15.6)') imfix1, imfix2, xfix(1), xfix(2), xfix(3), w_up, w_dn           
             !else
               !r0=in0*dely + xfix(1)
               !if(r0.gt.xfix(2)) exit
@@ -183,9 +222,9 @@
             !endif
             do in1=-NAX,NAX
               do in2=-NAX,NAX
-                write(41,'(2G20.8E3,G20.8E3)') in1*del1,in2*del2,xx0probut(0,in1,in2)*term
-                write(42,'(2G20.8E3,G20.8E3)') in1*del1,in2*del2,xx0probud(0,in1,in2)*term
-                write(43,'(2G20.8E3,G20.8E3)') in1*del1,in2*del2,xx0probuu(0,in1,in2)*term
+                write(41,'(2G20.8E3,G20.8E3)') in1*del1,in2*del2,xx0probut(0,in1,in2)*term_u_fix
+                write(42,'(2G20.8E3,G20.8E3)') in1*del1,in2*del2,xx0probud(0,in1,in2)*term_u_fix
+                write(43,'(2G20.8E3,G20.8E3)') in1*del1,in2*del2,xx0probuu(0,in1,in2)*term_u_fix
               enddo
               write(41,*)
               write(42,*)
@@ -226,9 +265,9 @@
               !write(41,'(''# Grid point:'',i4,''  r0 ='',G20.8E3)') in0,r0
               !write(42,'(''# Grid point:'',i4,''  r0 ='',G20.8E3)') in0,r0
               !write(43,'(''# Grid point:'',i4,''  r0 ='',G20.8E3)') in0,r0
-              write(41, '("Grid index:",i4,1x,i4,", xfix=",G20.8E3,1x,G20.8E3,1x,G20.8E3)') imfix1, imfix2, xfix(1), xfix(2), xfix(3) !GO
-              write(42, '("Grid index:",i4,1x,i4,", xfix=",G20.8E3,1x,G20.8E3,1x,G20.8E3)') imfix1, imfix2, xfix(1), xfix(2), xfix(3)
-              write(43, '("Grid index:",i4,1x,i4,", xfix=",G20.8E3,1x,G20.8E3,1x,G20.8E3)') imfix1, imfix2, xfix(1), xfix(2), xfix(3)
+              write(41, '("Grid index:",i4,1x,i4,", xfix=",3G20.8E3,", W_up=",G15.6,", W_dn=",G15.6)') imfix1, imfix2, xfix(1), xfix(2), xfix(3), w_up, w_dn
+              write(42, '("Grid index:",i4,1x,i4,", xfix=",3G20.8E3,", W_up=",G15.6,", W_dn=",G15.6)') imfix1, imfix2, xfix(1), xfix(2), xfix(3), w_up, w_dn
+              write(43, '("Grid index:",i4,1x,i4,", xfix=",3G20.8E3,", W_up=",G15.6,", W_dn=",G15.6)') imfix1, imfix2, xfix(1), xfix(2), xfix(3), w_up, w_dn
             !else
               !r0=in0*dely + xfix(1)
               !if(r0.gt.xfix(2)) exit
@@ -238,9 +277,9 @@
             !endif
             do in1=-NAX,NAX
               do in2=-NAX,NAX
-                write(41,'(2G20.8E3,G20.8E3)') in1*del1,in2*del2,xx0probdt(0,in1,in2)*term
-                write(42,'(2G20.8E3,G20.8E3)') in1*del1,in2*del2,xx0probdd(0,in1,in2)*term
-                write(43,'(2G20.8E3,G20.8E3)') in1*del1,in2*del2,xx0probdu(0,in1,in2)*term
+                write(41,'(2G20.8E3,G20.8E3)') in1*del1,in2*del2,xx0probdt(0,in1,in2)*term_d_fix
+                write(42,'(2G20.8E3,G20.8E3)') in1*del1,in2*del2,xx0probdd(0,in1,in2)*term_d_fix
+                write(43,'(2G20.8E3,G20.8E3)') in1*del1,in2*del2,xx0probdu(0,in1,in2)*term_d_fix
               enddo
               write(41,*)
               write(42,*)
@@ -293,7 +332,7 @@
             ri = in1*dely
             ri2 = 1.0  ! no need to normalize by 1/r^2 for wires
           elseif(rring.eq.0.d0) then
-            ri=(in1*1.d0-0.5d0)*delx
+            ri=(in1*1.d0-0.5d0)*del1
             ri2 = ri*ri
           else
             ri = in1/delradi + rmean
@@ -441,6 +480,94 @@
         close(46)
         close(47)
         close(48)
+      endif
+      
+      ! ---------------------------------------------------------
+      ! BFF Density and Inter-Ring Phase Correlation Output
+      ! ---------------------------------------------------------
+      if(ifixe.le.-2 .and. M_bff.gt.0) then
+        if(index(mode,'vmc').ne.0) then
+          file1='bffden_t_vmc'
+          file2='bffden_u_vmc'
+          file3='bffden_d_vmc'
+          file4='ircorr_vmc'
+        else
+          file1='bffden_t_dmc'
+          file2='bffden_u_dmc'
+          file3='bffden_d_dmc'
+          file4='ircorr_dmc'
+        endif
+
+        if(idtask.eq.0) then
+          open(41,file=file1,status='unknown')
+          open(42,file=file2,status='unknown')
+          open(43,file=file3,status='unknown')
+        else
+          open(41,status='scratch')
+          open(42,status='scratch')
+          open(43,status='scratch')
+        endif
+
+!       1. Header: Write the parameters and Order Parameters mapped to all parsed rings
+        write(41,'("# sub_id_bff: ",i5,", M_bff: ",i5)') sub_id_bff,M_bff
+        write(41,'("# conf_bff: ",*(i5))') conf_bff(1:nrings_bff)
+        write(41,'("# sub_conf_bff: ",*(i5))') sub_conf_bff(1:nsubrings_bff)
+        write(41,'("# MAIN shell M-fold Order Parameters: ", *(G15.6))') (psi_M_acc_bff(ir) * alg_weight / passes, ir=1,nrings_bff)
+        write(41,'(a)') '# BFF body angle: rotation-only geometric polygon fit'
+
+        write(42,'("# sub_id_bff: ",i5,", M_bff: ",i5)') sub_id_bff,M_bff
+        write(42,'("# conf_bff: ",*(i5))') conf_bff(1:nrings_bff)
+        write(42,'("# sub_conf_bff: ",*(i5))') sub_conf_bff(1:nsubrings_bff)
+        write(42,'("# MAIN shell M-fold Order Parameters: ", *(G15.6))') (psi_M_acc_bff(ir) * alg_weight / passes, ir=1,nrings_bff)
+        write(42,'(a)') '# BFF body angle: rotation-only geometric polygon fit'
+
+        write(43,'("# sub_id_bff: ",i5,", M_bff: ",i5)') sub_id_bff,M_bff
+        write(43,'("# conf_bff: ",*(i5))') conf_bff(1:nrings_bff)
+        write(43,'("# sub_conf_bff: ",*(i5))') sub_conf_bff(1:nsubrings_bff)
+        write(43,'("# MAIN shell M-fold Order Parameters: ", *(G15.6))') (psi_M_acc_bff(ir) * alg_weight / passes, ir=1,nrings_bff)
+        write(43,'(a)') '# BFF body angle: rotation-only geometric polygon fit'
+        
+        ! 2. Recompute the Cartesian grid factor: Fourier output may have changed term.
+        term = 1.d0/(passes*del1*del2)
+        term = term * alg_weight
+        
+        do in1=-nax1,nax1
+          do in2=-nax2,nax2
+            write(41,'(2G20.8E3,G20.8E3)') in1*del1,in2*del2,bffden2d_t(in1,in2)*term
+            write(42,'(2G20.8E3,G20.8E3)') in1*del1,in2*del2,bffden2d_u(in1,in2)*term
+            write(43,'(2G20.8E3,G20.8E3)') in1*del1,in2*del2,bffden2d_d(in1,in2)*term
+          enddo
+          write(41,*)
+          write(42,*)
+          write(43,*)
+        enddo
+
+        close(41)
+        close(42)
+        close(43)
+
+        ! 3. Write Inter-Ring Phase Correlation
+        if(nrings_bff .ge. 2) then
+          if(idtask.eq.0) then
+            open(49,file=file4,status='unknown')
+          else
+            open(49,status='scratch')
+          endif
+          
+          ! Same common-harmonic bounds as in bffden2d.
+          range_half_bff = pi / dble(M_ir_bff)
+          del_phase_bff = 2.d0 * range_half_bff / dble(NIRBINS_bff)
+          write(49,'("# Main conf_bff: ",*(i5))') conf_bff(1:nrings_bff)
+          write(49,'("# Common main-shell harmonic: ",i6)') M_ir_bff
+          
+          do in1_bff = 1, NIRBINS_bff
+            angle_bff = -range_half_bff + (dble(in1_bff) - 0.5d0) * del_phase_bff
+            ! Divide by del_phase_bff to create a true continuous PDF
+            write(49,'(2G20.8E3)') angle_bff, (irphase_bff(in1_bff) * alg_weight) / (passes * del_phase_bff)
+          enddo
+          
+          close(49)
+        endif
       endif
 
       return

@@ -44,6 +44,7 @@
 
 !     common /contr3/ mode
       common /circularmesh/ rmin,rmax,rmean,delradi,delti,nmeshr,nmesht,icoosys
+      common /s2l2/ el2_det, s2_det, s2o, el2o, s2sum, el2sum, s2cum, el2cum, s2cm2, el2cm2
 
       dimension dx(3,nelec),idist(nelec),ixo(3),ixn(3)
       dimension xstrech(3,nelec)
@@ -85,7 +86,11 @@
 !         call hpsi(xnew,psidn,psijn,vnew,div_vn,d2,pen,enew(1),denergy,1)
 !         write(6,'(''calling hpsie from metrop_mov1'')')
           call hpsie(iel,xnew,psidn,psijn,vnew)
-          psi2n(1)=2*(dlog(dabs(psidn))+psijn)
+          if(psidn.eq.0.d0) then
+            psi2n(1)=-huge(psi2n(1))
+          else
+            psi2n(1)=2*(dlog(dabs(psidn))+psijn)
+          endif
 
 ! save electrostatic potential at new configuration
 !   distances.f is not called from from hpsie, so we add a call to distances here,
@@ -192,6 +197,7 @@
           endif
           if(izigzag.gt.0) call zigzag2d(p,q,xold,xnew,i)
           if(ifixe.le.-2) call pairden2d(p,q,xold,xnew)
+          if(ifixe.le.-2 .and. M_bff.gt.0) call bffden2d(p,q,xold,xnew)
           if(ifourier.eq.1 .or. ifourier.eq.3) call fourierrk(p,q,xold,xnew)
           if(ifourier.eq.2 .or. ifourier.eq.3) call fourierkk(p,q,xold,xnew)
 !          if(ifourier.eq.1) call fourier2d(1.d0,0.d0,xold,xnew)
@@ -294,6 +300,9 @@
       if(nforce.gt.1) call strech(xold,xstrech,ajacob,1,0)
       call hpsi(xold,psido,psijo,vold,div_vo,d2o,peo,peio,eold(1),denergy,1)
       psi2o(1)=2*(dlog(dabs(psido))+psijo)
+      
+      s2o=s2_det
+      el2o=el2_det
 
       eloc = eold(1)                 !JT
       psi_det = psido                !JT
@@ -313,12 +322,14 @@
       peisum=peisum+peio
       tpbsum=tpbsum+(eold(1)-peo)
       tjfsum=tjfsum+tjfo
+      s2sum=s2sum+s2o
+      el2sum=el2sum+el2o
 !      if(nefp.gt.0) then
 !        call sample_efp(1,xold,eold(1),1.d0)
 !        call efpsav
 !      endif
 
-      call grad_hess_jas_sum(1.d0,0.d0,eold(1),eold(1),1.d0,0.d0)
+      call grad_hess_jas_sum_vmc(1.d0,0.d0,eold(1),eold(1))
 
       call acues1
 
