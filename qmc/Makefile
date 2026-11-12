@@ -1821,7 +1821,8 @@ $(OBJDIR)/dmc/dmc_elec/dmc_good_ps_mov1.o: $(OBJDIR)/MED_tools/average_mod.o \
 	$(OBJDIR)/commons/stats_mod.o $(OBJDIR)/commons/stepv_mod.o \
 	$(OBJDIR)/commons/velratio_mod.o $(OBJDIR)/commons/zigzag_mod.o \
 	$(OBJDIR)/constants_mod.o $(OBJDIR)/control_mod.o \
-	$(OBJDIR)/eloc_mod.o $(OBJDIR)/jastrow_mod.o
+	$(OBJDIR)/determinants_mod.o $(OBJDIR)/eloc_mod.o \
+	$(OBJDIR)/jastrow_mod.o
 $(OBJDIR)/dmc/dmc_elec/dumper_dmc_mov1.o: $(OBJDIR)/commons/age_mod.o \
 	$(OBJDIR)/commons/atom_mod.o $(OBJDIR)/commons/basis1_mod.o \
 	$(OBJDIR)/commons/branch_mod.o $(OBJDIR)/commons/coefs_mod.o \

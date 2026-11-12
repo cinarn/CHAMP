@@ -209,15 +209,26 @@ Shell order parameters and inter-ring correlation always use MAIN conf_bff.
 The correlation uses its two outermost main shells and their lcm harmonic.
 Lab-frame origin, p/q weights, spin labels and normalization are unchanged.
 
-Collective VMC rotations (opt_list)
-----------------------------------
-irot_every=0 disables collective rotations (default). A positive value attempts
-one rotation before every irot_every single-electron sweeps. irot_order=3
-(default) chooses +120 or -120 degrees with equal probability. Other orders
-choose uniformly from the nonidentity C_n rotations about the origin.
-Acceptance uses the full |Psi(rotated)/Psi(current)|^2 Metropolis ratio;
-no potential, orbital coefficients, or density estimators are symmetrized.
-Supported: vmc_mov1 / vmc_mov1_mpi, ndim=2, ibasis=4, nloc=-8,
-iperiodic=0, nforce=1, imetro=1, and no fixed electron (ifixe<=0).
-Unsupported enabled settings, including DMC, stop with an input error.
-GLOBAL_ROTATION attempt/accept counts are local to each MPI process.
+Collective VMC/DMC rotations (opt_list)
+--------------------------------------
+irot_every=0 disables collective rotations (default). A positive value applies
+the move before every irot_every single-electron sweeps (VMC) or DMC steps.
+Rotations are C_n rotations about the origin, irot_order=3 by default.
+
+VMC: chooses uniformly from the nonidentity rotations (+120 or -120 degrees for
+n=3). Acceptance uses the full |Psi(rotated)/Psi(current)|^2 Metropolis ratio.
+
+DMC: each walker independently draws a group element uniformly (identity
+included) and is rotated without accept/reject, so walker weights are
+unchanged. This is exact only for a C_n-invariant trial wavefunction: after
+each rotation psi (sign and ln|psi|) and E_L must agree with the stored values
+to 1e-6 (E_L relative); otherwise the run stops with an error. The move
+equalizes walker populations between symmetry-equivalent regions that
+single-electron moves do not connect. Only the primary walk is rotated.
+
+No potential, orbital coefficients, or density estimators are symmetrized.
+Supported: vmc_mov1 / vmc_mov1_mpi with imetro=1, dmc_mov1 / dmc_mov1_mpi*
+with idmc=2; ndim=2, ibasis=4, nloc=-8, iperiodic=0, nforce=1, and no fixed
+electron (ifixe<=0). Unsupported enabled settings stop with an input error.
+GLOBAL_ROTATION (VMC) and GLOBAL_ROTATION_DMC counts and maximum deviations
+are local to each MPI process.

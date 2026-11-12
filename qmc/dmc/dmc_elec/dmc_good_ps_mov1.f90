@@ -172,6 +172,8 @@
         ncall=ncall+1
       endif
 
+      call dmc_global_rotation(ipass)
+
       ioldest=0
       do 300 iw=1,nwalk
 ! Loop over primary walker
@@ -871,3 +873,89 @@
 
       return
       end
+
+      subroutine dmc_global_rotation(ipass)
+! Collective C_n rotation of every walker about the origin, before the local moves.
+! For a C_n-invariant trial wavefunction the move is an exact symmetry: psi, E_L
+! and therefore the walker weight are unchanged, so there is no accept/reject.
+! Each walker draws a group element uniformly (identity included). Any change of
+! psi or E_L means the trial wavefunction is not invariant and stops the run.
+      use all_tools_mod
+      use const_mod, only: nelec
+      use contrl_mod, only: irot_order, irot_every
+      use config_dmc_mod, only: xoldw, voldw, psidow, psijow, peow, peiow, d2ow, pot_ee_oldw
+      use branch_mod, only: nwalk, eoldw
+      use branch_dmc_opt_mod, only: denergy_old_dmc
+      use contrl_opt_mod, only: nparm
+      use div_v_dmc_mod, only: div_vow
+      use delocc_mod, only: denergy
+      use distance_mod, only: pot_ee
+      use average_mod, only: current_walker
+      use determinants_mod, only: psi_det
+      use jastrow_mod, only: psi_jas
+      use, intrinsic :: ieee_arithmetic, only: ieee_is_finite
+      implicit none
+      integer, intent(in) :: ipass
+      real(8), parameter :: tolerance=1.d-6
+      integer :: iw, turn, electron
+      integer(8), save :: applications=0, rotated=0
+      real(8), save :: max_dlogpsi=0.d0, max_denergy=0.d0
+      real(8), external :: rannyu
+      real(8) :: angle, cosine, sine, x, psidn, psijn, d2n, pen, pein, enew, dlogpsi, denergy_rel
+      logical :: invariant
+
+      if(irot_every.le.0) return
+      if(mod(ipass,irot_every).ne.0) return
+      applications=applications+1
+      do iw=1,nwalk
+        turn=min(irot_order-1,int(rannyu(0)*dble(irot_order)))
+        if(turn.eq.0) cycle
+        angle=2.d0*acos(-1.d0)*dble(turn)/dble(irot_order)
+        cosine=cos(angle)
+        sine=sin(angle)
+        do electron=1,nelec
+          x=xoldw(1,electron,iw,1)
+          xoldw(1,electron,iw,1)=cosine*x-sine*xoldw(2,electron,iw,1)
+          xoldw(2,electron,iw,1)=sine*x+cosine*xoldw(2,electron,iw,1)
+        enddo
+        current_walker=iw
+        call object_modified_by_index(current_walker_index)
+! Full evaluation rebuilds the determinant/Jastrow caches and the drift velocity.
+        call hpsi(xoldw(1,1,iw,1),psidn,psijn,voldw(1,1,iw,1),div_vow(1,iw),d2n,pen,pein,enew,denergy,1)
+        invariant=ieee_is_finite(psidn).and.ieee_is_finite(psijn).and.ieee_is_finite(enew)
+        if(invariant) invariant=abs(psidn).gt.0.d0.and.sign(1.d0,psidn).eq.sign(1.d0,psidow(iw,1))
+        if(invariant) then
+          dlogpsi=abs(log(abs(psidn))+psijn-log(abs(psidow(iw,1)))-psijow(iw,1))
+          denergy_rel=abs(enew-eoldw(iw,1))/max(1.d0,abs(eoldw(iw,1)))
+          max_dlogpsi=max(max_dlogpsi,dlogpsi)
+          max_denergy=max(max_denergy,denergy_rel)
+          invariant=dlogpsi.le.tolerance.and.denergy_rel.le.tolerance
+        endif
+        if(.not.invariant) then
+          write(6,'(a,i0,a,i0,a,4es16.8)') 'GLOBAL_ROTATION_DMC walker=',iw,' turn=',turn, &
+     &      ' psid_old,psid_new,eloc_old,eloc_new=',psidow(iw,1),psidn,eoldw(iw,1),enew
+          error stop 'DMC rotation changed psi or E_L: trial wavefunction is not C_n invariant'
+        endif
+        psidow(iw,1)=psidn
+        psijow(iw,1)=psijn
+        d2ow(iw,1)=d2n
+        peow(iw,1)=pen
+        peiow(iw,1)=pein
+        eoldw(iw,1)=enew
+        if(nparm.gt.0) denergy_old_dmc(1:nparm,iw)=denergy(1:nparm)
+        pot_ee_oldw(:,iw,1)=pot_ee(:)
+        psi_det=psidn
+        psi_jas=exp(psijn)
+        call walksav_det(iw)
+        call walksav_jas(iw)
+        rotated=rotated+1
+      enddo
+      call object_modified_by_index(xoldw_index)
+      call object_modified_by_index(voldw_index)
+      call object_modified_by_index(div_vow_index)
+      call object_modified_by_index(psi_det_index)
+      call object_modified_by_index(psi_jas_index)
+      if(applications.eq.1.or.mod(applications,1000_8).eq.0) &
+     &  write(6,'(a,i0,a,i0,a,es10.3,a,es10.3)') 'GLOBAL_ROTATION_DMC applications=',applications, &
+     &    ' walkers_rotated=',rotated,' max_dlogpsi=',max_dlogpsi,' max_denergy_rel=',max_denergy
+      end subroutine dmc_global_rotation
