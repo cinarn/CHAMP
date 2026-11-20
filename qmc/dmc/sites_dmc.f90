@@ -12,37 +12,23 @@
       use dim_mod
       use config_dmc_mod
       use site_pref_mod
+      use dets_mod, only: nup
+      use pseudo_mod, only: nloc
       implicit real*8(a-h,o-z)
 
-      dimension nsite(ncent)
+      dimension nsite(ncent), nsite_spin(ncent,2)
 
 !     sites
       ! distribute electrons randomly among the centers
-      l = nelec !NC
-      do i=1, ncent
-         nsite(i) = 0
-      end do
-      do while (l .gt. 0)
-         k = 1+(1+isign(1,l-nup-1))/2
-         i = int(rannyu(0)*ncent + 0.5d0)
-         if (rannyu(0) .le. site_prob(k,i)) then
-            nsite(i) = nsite(i) + 1
-            if (nsite(i) .le. znuc(iwctype(i))) then
-               l = l - 1
-            else
-               nsite(i) = nsite(i) - 1
-            end if
-         end if
-      end do
+      call initial_site_occupations(ncent, nelec, nup, nloc, &
+     &  znuc(iwctype(1:ncent)), nsite, nsite_spin)
 
-
-! loop over spins and centers. If odd number of electrons on all
-! atoms then the up-spins have an additional electron.
+! loop over spins and centers in the order supplied by the initializer.
 
       l=0
       do 10 ispin=1,2
         do 10 i=1,ncent
-          ju=(nsite(i)+2-ispin)/2
+          ju=nsite_spin(i,ispin)
           if(znuc(iwctype(i)).eq.0.d0) stop 'znuc should not be 0 in sites'
           do 10 j=1,ju
             l=l+1

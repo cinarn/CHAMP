@@ -1,4 +1,4 @@
-      subroutine sites(x,nelec,nsite)
+      subroutine sites(x,nelec,nsite,nsite_spin)
 ! Written by Cyrus Umrigar
       use constants_mod
       use atom_mod
@@ -25,13 +25,11 @@
       common /gndot/ gndot_v0, gndot_rho, gndot_s, gndot_k !GO
       common /wire/ wire_w,wire_length,wire_length2,wire_radius2, wire_potential_cutoff,wire_prefactor,wire_root1
 
-      dimension x(3,*),nsite(*)
+      dimension x(3,*),nsite(*),nsite_spin(ncent,2)
       dimension indcoefavailup(nbasis), indcoefavaildn(nbasis) !GO
       dimension nbasup(nbasis), nbasdn(nbasis) !GO
 
-! Loop over spins and centers. If odd number of electrons on all
-! atoms then the up-spins have an additional electron.
-! So assumption is that system is not strongly polarized.
+! The caller supplies counts in up-then-down order.
 
 !     gauss()=dcos(two*pi*rannyu(0))*dsqrt(-two*dlog(rannyu(0)))
       pi=4*datan(1.d0)
@@ -83,7 +81,7 @@
             if(znuc(iwctype(i)).eq.0.d0) stop 'znuc should not be 0 in sites for atoms and molecules'
             znucc=znuc(iwctype(i))
           endif
-          ju=(nsite(i)+2-ispin)/2
+          ju=nsite_spin(i,ispin)
           do 10 j=1,ju
             ielec=ielec+1
             if(ielec.gt.nelec) return

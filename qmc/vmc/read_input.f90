@@ -1181,7 +1181,8 @@
       call object_modified ('norb') !JT
 
       call alloc('site_prob', site_prob, 2, ncent)
-      if (file_exist('site_prob')) then
+      site_prob_given = file_exist('site_prob')
+      if (site_prob_given) then
         sp_fid = -1
         call open_file_or_die('site_prob', sp_fid)
         do i=1, 2
@@ -1194,7 +1195,7 @@
       call object_modified('site_prob')
 
       write(6, '(''site_prob(1,:) = '',x,*(f10.8,1x))') (site_prob(1,j),j=1,ncent)
-      write(6, '(''site_prob(1,:) = '',x,*(f10.8,1x))') (site_prob(2,j),j=1,ncent)
+      write(6, '(''site_prob(2,:) = '',x,*(f10.8,1x))') (site_prob(2,j),j=1,ncent)
 
 !     total number of orbitals
       orb_tot_nb = norb
@@ -2255,6 +2256,8 @@
 
       write(6,'(''nparm,nparml,nparmj,nparmcsf,nparms,nparmg,nparme='',9i5)') nparm,nparml,nparmj,nparmcsf,nparms,nparmg,nparme
       write(6,'(''total number of parameters, nparm='',i5)') nparm
+      if(index(mode,'vmc').eq.1 .and. nopt_iter.gt.0 .and. nparm.le.0) &
+     &  error stop 'nopt_iter > 0 requires nparm > 0; use nopt_iter=0 for measurement'
 
       if(mbasis_ctype.gt.0) then   ! Needed since nbasis_ctype(it) is not initialized for quantum rings
         call alloc ('imnbas', imnbas, ncent)

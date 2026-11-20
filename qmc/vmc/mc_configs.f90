@@ -42,10 +42,12 @@
       use dim_mod
       use pairden_mod
       use site_pref_mod
+      use dets_mod, only: nup
+      use pseudo_mod, only: nloc
 
       implicit real*8(a-h,o-z)
 
-      dimension nsite(ncent)
+      dimension nsite(ncent), nsite_spin(ncent,2)
 
 ! Truncate fbias so that it is never negative, and the quantity
 ! sampled is never negative
@@ -66,22 +68,9 @@
         goto 395
 
         ! distribute electrons randomly among the centers
-  393   l = nelec !NC
-          do i=1, ncent
-             nsite(i) = 0
-          end do
-          do while (l .gt. 0)
-             k = 1+(1+isign(1,l-nup-1))/2
-             i = int(rannyu(0)*ncent + 0.5d0)
-             if (rannyu(0) .le. site_prob(k,i)) then
-                nsite(i) = nsite(i) + 1
-                if (nsite(i) .le. znuc(iwctype(i))) then
-                   l = l - 1
-                else
-                   nsite(i) = nsite(i) - 1
-                end if
-             end if
-          end do
+  393   call initial_site_occupations(ncent, nelec, nup, nloc, &
+     &    znuc(iwctype(1:ncent)), nsite, nsite_spin)
+        call sites(xold,nelec,nsite,nsite_spin)
   395   continue
 
 ! fix the position of electron i=ifixe for pair-density calculation:
@@ -90,7 +79,6 @@
   398       xold(k,ifixe)=xfix(k)
         endif
 
-        call sites(xold,nelec,nsite)
         call object_modified ('xold') ! JT
 !JT        write(6,'(/,''initial configuration from sites'')')
 
