@@ -15,6 +15,7 @@
       use dim_mod
       use pairden_mod
       use site_pref_mod
+      use dets_mod, only: nup
       implicit real*8(a-h,o-z)
 
       dimension nsite(ncent)
@@ -51,22 +52,8 @@
           write(6,'(/,''initial configuration from unit 9'')')
          goto 395
           ! distribute electrons randomly among the centers
-  393   l = nelec !NC
-        do i=1, ncent
-            nsite(i) = 0
-        end do
-        do while (l .gt. 0)
-           k = 1+(1+isign(1,l-nup-1))/2
-           i = int(rannyu(0)*ncent + 0.5d0)
-           if (rannyu(0) .le. site_prob(k,i)) then
-              nsite(i) = nsite(i) + 1
-              if (nsite(i) .le. znuc(iwctype(i))) then
-                 l = l - 1
-              else
-                 nsite(i) = nsite(i) - 1
-              end if
-           end if
-        end do
+  393   call sample_site_occupations(ncent, nelec, nup, &
+     &    znuc(iwctype(1:ncent)), site_prob, nsite)
         call sites(xold,nelec,nsite)
 !JT          write(6,'(/,''initial configuration from sites'')')
   395 continue
