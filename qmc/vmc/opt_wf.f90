@@ -367,6 +367,13 @@
         write(6,*)
   430   write(2,*)
   440   nforce=1
+! The last step of the loop has never been sampled. Finish from the best wave function seen
+! (when one was recorded), so that the final VMC run describes the same wave function that
+! wf_best_write puts into wavefn_new.
+        if(energy_plus_err_best.lt.1.d98) then
+          call wf_best_restore
+          call set_scale_dist(-1,1)
+        endif
       endif
 
 ! Do vmc with either input params. if nopt_iter=0 or with optim. param if nopt_iter>0

@@ -121,8 +121,6 @@
       rewind 10
       write(6,'(1x,''successful dump to restart_vmc'')')
 
-      call grad_hess_jas_dump(10)
-
       return
 
       entry startr_serial

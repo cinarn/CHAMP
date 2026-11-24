@@ -235,6 +235,7 @@
       subroutine grad_hess_jas_cum(wsum,enow)
 
       use optim_mod
+      use contrl_opt_mod, only: nparm
       use contrl_opt2_mod
       use gradhessder_mod
       use gradjerr_mod
@@ -242,16 +243,16 @@
 
       common /gradjerrb/ ngrad_jas_blocks,ngrad_jas_bcum,nb_current
 
-      dimension dj_e_b(nparmjs),dj_b(nparmjs)
+      dimension dj_e_b(nparm),dj_b(nparm)
 
       if(igradhess.eq.0.or.ngrad_jas_blocks.eq.0) return
 
-      do 10 i=1,nparmj+nparms
+      do 10 i=1,nparm
         dj_e_b(i)=dj_e(i)-dj_e_save(i)
    10   dj_b(i)=dj(i)-dj_save(i)
 
       e_bsum=e_bsum+enow
-      do 20 i=1,nparmj+nparms
+      do 20 i=1,nparm
         dj_e_bsum(i)=dj_e_bsum(i)+dj_e_b(i)/wsum
    20   dj_bsum(i)=dj_bsum(i)+dj_b(i)/wsum
 
@@ -261,7 +262,7 @@
         ngrad_jas_bcum=ngrad_jas_bcum+1
         eb=e_bsum/dble(ngrad_jas_blocks)
         e_bsum=0
-        do 30 i=1,nparmj+nparms
+        do 30 i=1,nparm
           gnow=2*(dj_e_bsum(i)-dj_bsum(i)*eb)/dble(ngrad_jas_blocks)
           grad_jas_bcum(i)=grad_jas_bcum(i)+gnow
           grad_jas_bcm2(i)=grad_jas_bcm2(i)+gnow**2
@@ -269,7 +270,7 @@
    30     dj_bsum(i)=0
       endif
 
-      do 40 i=1,nparmj+nparms
+      do 40 i=1,nparm
         dj_e_save(i)=dj_e(i)
    40   dj_save(i)=dj(i)
 
@@ -378,13 +379,13 @@
    10     de_de(i,j)=0
 
       e_bsum=0
-      call alloc ('grad_jas_bcum', grad_jas_bcum, nparmjs)
-      call alloc ('grad_jas_bcm2', grad_jas_bcm2, nparmjs)
-      call alloc ('dj_e_bsum', dj_e_bsum, nparmjs)
-      call alloc ('dj_bsum', dj_bsum, nparmjs)
-      call alloc ('dj_e_save', dj_e_save, nparmjs)
-      call alloc ('dj_save', dj_save, nparmjs)
-      do 20 i=1,nparmj+nparms
+      call alloc ('grad_jas_bcum', grad_jas_bcum, nparm)
+      call alloc ('grad_jas_bcm2', grad_jas_bcm2, nparm)
+      call alloc ('dj_e_bsum', dj_e_bsum, nparm)
+      call alloc ('dj_bsum', dj_bsum, nparm)
+      call alloc ('dj_e_save', dj_e_save, nparm)
+      call alloc ('dj_save', dj_save, nparm)
+      do 20 i=1,nparm
         grad_jas_bcum(i)=0
         grad_jas_bcm2(i)=0
         dj_e_bsum(i)=0
@@ -402,6 +403,7 @@
       subroutine grad_hess_jas_dump(iu)
 
       use optim_mod
+      use contrl_opt_mod, only: nparm
       use contrl_opt2_mod
       use gradhessder_mod
       use gradjerr_mod
@@ -412,17 +414,18 @@
 
 
       if(igradhess.eq.0) return
-! to do: write out which parameters are being varied -> check for restart
+! The accumulators are indexed in the global CSF, orbital, scalek, Jastrow order,
+! so all nparm entries are dumped (identical to the old format if nparm=nparmj).
 ! Warning: Except for dj_de the rest are sym. so we do not really need to write entire matrix
-      write(iu) nparmj
-      write(iu) (dj(i),de(i),dj_e(i),de_e(i),dj_e2(i),e2(i),i=1,nparmj)
-      write(iu) ((dj_de(i,j),j=1,nparmj),i=1,nparmj)
-!     write(iu) ((dj_dj(i,j),dj_dj_e(i,j),j=1,i),i=1,nparmj)
-      write(iu) ((dj_dj(i,j),dj_dj_e(i,j),j=1,nparmj),i=1,nparmj)
-      write(iu) ((d2j(i,j),d2j_e(i,j),j=1,nparmj),i=1,nparmj)
-      write(iu) ((de_de(i,j),j=1,nparmj),i=1,nparmj)
+      write(iu) nparm
+      write(iu) (dj(i),de(i),dj_e(i),de_e(i),dj_e2(i),e2(i),i=1,nparm)
+      write(iu) ((dj_de(i,j),j=1,nparm),i=1,nparm)
+!     write(iu) ((dj_dj(i,j),dj_dj_e(i,j),j=1,i),i=1,nparm)
+      write(iu) ((dj_dj(i,j),dj_dj_e(i,j),j=1,nparm),i=1,nparm)
+      write(iu) ((d2j(i,j),d2j_e(i,j),j=1,nparm),i=1,nparm)
+      write(iu) ((de_de(i,j),j=1,nparm),i=1,nparm)
       if(ngrad_jas_blocks.gt.0) &
-     & write(iu) (grad_jas_bcum(i),grad_jas_bcm2(i),i=1,nparmj),ngrad_jas_bcum
+     & write(iu) (grad_jas_bcum(i),grad_jas_bcm2(i),i=1,nparm),ngrad_jas_bcum
 
       return
       end
@@ -431,6 +434,7 @@
 
       use all_tools_mod
       use optim_mod
+      use contrl_opt_mod, only: nparm
       use contrl_opt2_mod
       use gradhessder_mod
       use gradjerr_mod
@@ -440,34 +444,36 @@
 
       if(igradhess.eq.0) return
 
-      read(iu) nparmj
-      call alloc ('dj', dj, nparmj)
-      call alloc ('dj_e', dj_e, nparmj)
-      call alloc ('dj_de', dj_de, nparmj, nparmj)
-      call alloc ('dj_dj', dj_dj, nparmj, nparmj)
-      call alloc ('dj_dj_e', dj_dj_e, nparmj, nparmj)
-      call alloc ('de', de, nparmj)
-      call alloc ('d2j', d2j, nparmj, nparmj)
-      call alloc ('d2j_e', d2j_e, nparmj, nparmj)
-      call alloc ('de_e', de_e, nparmj)
-      call alloc ('e2', e2, nparmj)
-      call alloc ('dj_e2', dj_e2, nparmj)
-      call alloc ('de_de', de_de, nparmj, nparmj)
-      read(iu) (dj(i),de(i),dj_e(i),de_e(i),dj_e2(i),e2(i),i=1,nparmj)
-      read(iu) ((dj_de(i,j),j=1,nparmj),i=1,nparmj)
-!     read(iu) ((dj_dj(i,j),dj_dj_e(i,j),j=1,i),i=1,nparmj)
-      read(iu) ((dj_dj(i,j),dj_dj_e(i,j),j=1,nparmj),i=1,nparmj)
-      read(iu) ((d2j(i,j),d2j_e(i,j),j=1,nparmj),i=1,nparmj)
-      read(iu) ((de_de(i,j),j=1,nparmj),i=1,nparmj)
+! Do not overwrite nparmj: the dump holds all nparm accumulators.
+      read(iu) nparm_dump
+      if(nparm_dump.ne.nparm) stop 'grad_hess_jas_rstrt: nparm in restart_vmc differs from input'
+      call alloc ('dj', dj, nparm)
+      call alloc ('dj_e', dj_e, nparm)
+      call alloc ('dj_de', dj_de, nparm, nparm)
+      call alloc ('dj_dj', dj_dj, nparm, nparm)
+      call alloc ('dj_dj_e', dj_dj_e, nparm, nparm)
+      call alloc ('de', de, nparm)
+      call alloc ('d2j', d2j, nparm, nparm)
+      call alloc ('d2j_e', d2j_e, nparm, nparm)
+      call alloc ('de_e', de_e, nparm)
+      call alloc ('e2', e2, nparm)
+      call alloc ('dj_e2', dj_e2, nparm)
+      call alloc ('de_de', de_de, nparm, nparm)
+      read(iu) (dj(i),de(i),dj_e(i),de_e(i),dj_e2(i),e2(i),i=1,nparm)
+      read(iu) ((dj_de(i,j),j=1,nparm),i=1,nparm)
+!     read(iu) ((dj_dj(i,j),dj_dj_e(i,j),j=1,i),i=1,nparm)
+      read(iu) ((dj_dj(i,j),dj_dj_e(i,j),j=1,nparm),i=1,nparm)
+      read(iu) ((d2j(i,j),d2j_e(i,j),j=1,nparm),i=1,nparm)
+      read(iu) ((de_de(i,j),j=1,nparm),i=1,nparm)
       if(ngrad_jas_blocks.gt.0) then
-      call alloc ('grad_jas_bcum', grad_jas_bcum, nparmj)
-      call alloc ('grad_jas_bcm2', grad_jas_bcm2, nparmj)
-       read(iu) (grad_jas_bcum(i),grad_jas_bcm2(i),i=1,nparmj),ngrad_jas_bcum
+      call alloc ('grad_jas_bcum', grad_jas_bcum, nparm)
+      call alloc ('grad_jas_bcm2', grad_jas_bcm2, nparm)
+       read(iu) (grad_jas_bcum(i),grad_jas_bcm2(i),i=1,nparm),ngrad_jas_bcum
       endif
 
-      call alloc ('dj_e_save', dj_e_save, nparmj)
-      call alloc ('dj_save', dj_save, nparmj)
-      do 10 i=1,nparmj
+      call alloc ('dj_e_save', dj_e_save, nparm)
+      call alloc ('dj_save', dj_save, nparm)
+      do 10 i=1,nparm
         dj_e_save(i)=dj_e(i)
    10   dj_save(i)=dj(i)
 

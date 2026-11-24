@@ -822,7 +822,6 @@
             eloc_dmc = eoldw(iw,1)
             call object_modified_by_index (eloc_dmc_index)
 
-            call grad_hess_jas_sum(1.d0,0.d0,eoldw(iw,1),eoldw(iw,1))
           else
             ro=ajacold(iw,ifr)*psidow(iw,ifr)**2*exp(2*psijow(iw,ifr)-psi2savo)
 ! Warning: Limit weight ratio
